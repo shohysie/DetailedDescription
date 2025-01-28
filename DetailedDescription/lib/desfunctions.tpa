@@ -337,16 +337,20 @@ BEGIN
 	PATCH_IF opcode == 17 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (firsteff + peffect - 1)) readamount
 		READ_LONG (8 + effoffset + 0x30 * (firsteff + peffect - 1)) readtype
+		READ_LONG (28 + effoffset + 0x30 * (firsteff + peffect - 1)) readdiceamonut
+		READ_LONG (32 + effoffset + 0x30 * (firsteff + peffect - 1)) readdicesize
 		SET descfixed = 0
-		PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－当前HP修正：%readamount%~ SET descfixed = 1 END
-		PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－当前HP设为：%readamount%~ SET descfixed = 1 END
-		PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－当前HP设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－当前HP修正：~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－当前HP设为：~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－当前HP设为当前的百分比：~ SET descfixed = 1 END		
 		PATCH_IF (descfixed = 1) BEGIN
+			PATCH_IF (readdiceamonut != 0) && (readdicesize != 0) BEGIN
+				SPRINT newdesc ~%newdesc%~^~%readdiceamonut%D%readdicesize%~
+				PATCH_IF readamount > 0 BEGIN SPRINT newdesc ~%newdesc%~^~＋%readamount%~ END
+				PATCH_IF readamount < 0 BEGIN SPRINT newdesc ~%newdesc%~^~%readamount%~ END
+			END
+			PATCH_IF (readdiceamonut == 0)||(readdicesize == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%readamount%~ END
 			LPF APPEND_EFFECT_DESC INT_VAR ppability = pability ppeffect = peffect STR_VAR ppdesc = EVAL ~%newdesc%~ RET newdesc END
-			READ_LONG (28 + effoffset + 0x30 * (firsteff + peffect - 1)) readdiceamonut	//maxlevel
-			PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
-			READ_LONG (32 + effoffset + 0x30 * (firsteff + peffect - 1)) readdicesize	//minlevel
-			PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
 		END
 	END
 
