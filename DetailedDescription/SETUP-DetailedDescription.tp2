@@ -1,0 +1,414 @@
+BACKUP ~DetailedDescription/backup~
+AUTHOR ~shohy@126.com~
+VERSION ~v0.1~
+
+BEGIN ~物品增加详细说明~
+INCLUDE ~DetailedDescription/lib/desfunctions.tpa~
+
+COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
+//COPY_EXISTING ~CLCK04.ITM~ ~override~
+	PATCH_IF (SOURCE_SIZE > 0x71) BEGIN
+		READ_SHORT 0x1c itemtype
+		READ_LONG 0x54 iddescref
+		READ_STRREF 0x54 iddesc
+		PATCH_IF (iddescref >= 0 && iddescref < 2147483646) BEGIN
+			PATCH_IF ~%iddesc%~ STRING_CONTAINS_REGEXP ~Invalid Strref~ BEGIN
+				//去除所有中文文本空格			
+				INNER_PATCH_SAVE newdesc ~%iddesc%~ BEGIN	//修改文本
+					//REPLACE_TEXTUALLY ~^ +- +\(.+\)$~ ~－\1~
+					//REPLACE_TEXTUALLY ~^ +\(.+\)$~ ~\1~
+					REPLACE_TEXTUALLY ~ +~ ~~
+				END
+				/*
+				PATCH_IF ~%newdesc%~ STRING_COMPARE ~%iddesc%~ BEGIN
+					INNER_ACTION BEGIN
+						STRING_SET_EVALUATE iddescref ~%newdesc%~
+					END
+				END
+				READ_STRREF 0x54 newdesc
+				*/
+				SET controlnum = (~%newdesc%~ STRING_COMPARE ~%iddesc%~)	//相等为0，不相等削过空格为1
+				PATCH_IF controlnum == 1 BEGIN SPRINT iddesc ~%newdesc%~ END	//削过空格的放这备份
+				
+				SET addnum = 0
+				SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%装备能力资料补充：~	//准备修改装备能力描述
+				PATCH_IF (itemtype != 0)&&(itemtype != 5)&&(itemtype != 8)&&(itemtype != 9)&&(itemtype != 11)&&(itemtype != 14)&&(itemtype != 31)&&(itemtype != 34)&&(itemtype != 35)&&(itemtype != 36)&&(itemtype != 37)&&(itemtype != 50) BEGIN
+					PATCH_IF FILE_CONTAINS_EVALUATED (~ITEMEXCL.2da~ ~%SOURCE_RES%~) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%不能和其它魔法物品同时穿戴~ SET addnum = addnum + 1 END
+					PATCH_IF itemtype == 7 BEGIN
+						READ_BYTE 0x1b readflag4
+						PATCH_IF (readflag4 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%无法防护致命一击~ END
+						SET addnum = addnum + 1
+					END
+					READ_SHORT 0x70 effectamount
+					PATCH_IF effectamount > 0 BEGIN
+						FOR (itmeffect = 1 ; itmeffect < (effectamount + 1) ; ++itmeffect) BEGIN	//遍历各个效果
+							LPF CHECK_EQUIP_EFFECT INT_VAR peffect = itmeffect pnum = addnum STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc addnum END
+						END
+					END
+				END
+				PATCH_IF addnum == 0 BEGIN SPRINT newdesc ~%iddesc%~ SET addnum = controlnum END	//装备能力完全没有，还原备份去掉“装备能力资料补充”。削过空格值变1表示后面要写入
+				
+				//是弹药
+				PATCH_IF (itemtype == 5)||(itemtype == 14)||(itemtype == 31) BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%战斗能力资料补充：~	//准备修改战斗能力描述
+					READ_BYTE 0x38 itmstack
+					PATCH_IF itmstack > 1 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%堆积上限：%itmstack%~ END
+					READ_LONG 0x64 abilityoffset
+					READ_SHORT 0x68 abilityamount
+					PATCH_IF abilityamount > 0 BEGIN
+						FOR (itmability = 1 ; itmability < (abilityamount + 1) ; ++itmability) BEGIN	//遍历各个战斗能力
+							READ_BYTE (abilityoffset + 0x38 * (itmability - 1)) abilitytype
+							READ_BYTE (2 + abilityoffset + 0x38 * (itmability - 1)) abilitylocation
+							READ_BYTE (12 + abilityoffset + 0x38 * (itmability - 1)) abilitytarget
+							READ_BYTE (16 + abilityoffset + 0x38 * (itmability - 1)) launcherrequired
+							READ_SHORT (50 + abilityoffset + 0x38 * (itmability - 1)) isarrow
+							READ_SHORT (52 + abilityoffset + 0x38 * (itmability - 1)) isbolt
+							READ_SHORT (54 + abilityoffset + 0x38 * (itmability - 1)) isbullet
+							//PATCH_IF ((abilitytype == 2)&&(abilitylocation == 1)&&(abilitytarget == 1)&&(launcherrequired > 0)&&(isarrow||isbolt||isbullet)) BEGIN
+							PATCH_IF ((abilitytype == 2)&&(abilitylocation == 1)&&(launcherrequired > 0)&&(isarrow||isbolt||isbullet)) BEGIN
+								SET addnum = addnum + 1
+								SPRINT newdesc ~%newdesc%~^~%WNL%弹药能力：~
+								READ_BYTE 0x18 itmflag1
+								READ_BYTE 0x60 itmenchant
+								PATCH_IF (itmflag1 & 0b01000000) = 0b01000000 BEGIN
+									SPRINT newdesc ~%newdesc%~^~%WNL%－魔法武器，附魔等级：%itmenchant%~
+								END ELSE BEGIN
+									SPRINT newdesc ~%newdesc%~^~%WNL%－非魔法武器，附魔等级：%itmenchant%~
+								END
+								READ_BYTE 0x19 itmflag2
+								PATCH_IF (itmflag2 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－材质：银~ END
+								PATCH_IF (itmflag2 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－材质：寒铁~ END
+								READ_SHORT (20 + abilityoffset + 0x38 * (itmability - 1)) abilitytohit
+								SPRINT newdesc ~%newdesc%~^~%WNL%－命中修正：%abilitytohit%~
+								READ_BYTE (22 + abilityoffset + 0x38 * (itmability - 1)) dicesize
+								READ_BYTE (24 + abilityoffset + 0x38 * (itmability - 1)) diceamount
+								READ_SHORT (26 + abilityoffset + 0x38 * (itmability - 1)) damagebonus
+								PATCH_IF damagebonus > 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%＋%damagebonus%~ END
+								PATCH_IF damagebonus < 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%%damagebonus%~ END
+								PATCH_IF damagebonus = 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%~ END
+								READ_SHORT (28 + abilityoffset + 0x38 * (itmability - 1)) damagetype
+								PATCH_IF (damagetype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺~ END
+								PATCH_IF (damagetype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：钝击~ END
+								PATCH_IF (damagetype == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：挥砍~ END
+								PATCH_IF (damagetype == 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：远程~ END
+								PATCH_IF (damagetype == 5) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：拳头~ END
+								PATCH_IF (damagetype == 6) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺或钝击~ END
+								PATCH_IF (damagetype == 7) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺或挥砍~ END
+								PATCH_IF (damagetype == 8) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：钝击或挥砍~ END
+								READ_SHORT (34 + abilityoffset + 0x38 * (itmability - 1)) maxcharge
+								PATCH_IF (maxcharge == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－无限使用~ END
+								//READ_SHORT (36 + abilityoffset + 0x38 * (itmability - 1)) abilityusedup
+								READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
+								READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
+								PATCH_IF abilityeffects > 0 BEGIN
+									FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
+										LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+									END
+								END
+								
+							END
+						END
+					END
+				END
+
+				//是远程武器
+				PATCH_IF (itemtype == 15)||(itemtype == 18)||(itemtype == 27) BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%战斗能力资料补充：~	//准备修改战斗能力描述
+					READ_BYTE 0x31 abilityprof
+					PATCH_IF (abilityprof == 89) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：巨剑~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 90) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：长剑~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 91) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：短剑~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 92) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：战斧~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 93) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：双手剑~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 94) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：武士刀~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 95) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：弯刀／腰刀／忍者刀~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 96) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：匕首~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 97) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：战锤~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 98) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：长矛~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 99) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：战戟~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 100) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：链枷／流星锤~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 101) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：钉头锤~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 102) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：手杖~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 103) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：十字弓~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 104) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：长弓~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 105) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：短弓~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 106) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：飞镖锤~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 107) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：投石索~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 115) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：棍棒~ SET addnum = addnum + 1 END
+					READ_LONG 0x64 abilityoffset
+					READ_SHORT 0x68 abilityamount
+					PATCH_IF abilityamount > 0 BEGIN
+						FOR (itmability = 1 ; itmability < (abilityamount + 1) ; ++itmability) BEGIN	//遍历各个战斗能力
+							READ_BYTE (abilityoffset + 0x38 * (itmability - 1)) abilitytype
+							READ_BYTE (2 + abilityoffset + 0x38 * (itmability - 1)) abilitylocation
+							READ_BYTE (12 + abilityoffset + 0x38 * (itmability - 1)) abilitytarget
+							READ_BYTE (16 + abilityoffset + 0x38 * (itmability - 1)) launcherrequired
+							READ_SHORT (50 + abilityoffset + 0x38 * (itmability - 1)) isarrow
+							READ_SHORT (52 + abilityoffset + 0x38 * (itmability - 1)) isbolt
+							READ_SHORT (54 + abilityoffset + 0x38 * (itmability - 1)) isbullet
+							
+							//PATCH_IF ((abilitytype == 4)&&(abilitylocation == 1)&&(abilitytarget == 1)&&(launcherrequired != 0)&&(isarrow||isbolt||isbullet)) BEGIN
+							PATCH_IF ((abilitytype == 4)&&(abilitylocation == 1)) BEGIN
+								SET addnum = addnum + 1
+								SPRINT newdesc ~%newdesc%~^~%WNL%远程能力（需弹药）：~
+								READ_SHORT (14 + abilityoffset + 0x38 * (itmability - 1)) abilityrange
+								SPRINT newdesc ~%newdesc%~^~%WNL%－射程：%abilityrange%~
+								READ_SHORT (18 + abilityoffset + 0x38 * (itmability - 1)) abilityspeed
+								SPRINT newdesc ~%newdesc%~^~%WNL%－出手时间：%abilityspeed%~
+								READ_SHORT (20 + abilityoffset + 0x38 * (itmability - 1)) abilitytohit
+								SPRINT newdesc ~%newdesc%~^~%WNL%－命中修正：%abilitytohit%~
+								READ_SHORT (26 + abilityoffset + 0x38 * (itmability - 1)) damagebonus
+								SPRINT newdesc ~%newdesc%~^~%WNL%－伤害修正：%damagebonus%~
+								READ_BYTE (38 + abilityoffset + 0x38 * (itmability - 1)) abilityflag1
+								PATCH_IF (abilityflag1 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－命中和伤害受力量加成~ END
+								PATCH_IF (abilityflag1 & 0b00000100) = 0b00000100 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害受力量加成~ END
+								PATCH_IF (abilityflag1 & 0b00001000) = 0b00001000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－命中受力量加成~ END
+								READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
+								READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
+								PATCH_IF abilityeffects > 0 BEGIN
+									FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
+										LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+									END
+								END
+							END
+							//PATCH_IF ((abilitytype == 2)&&(abilitylocation == 1)&&(abilitytarget == 1)&&(launcherrequired == 0)&&(isarrow||isbolt||isbullet)) BEGIN
+							PATCH_IF ((abilitytype == 2)&&(abilitylocation == 1)) BEGIN
+								SET addnum = addnum + 1
+								SPRINT newdesc ~%newdesc%~^~%WNL%远程能力（无需弹药）：~
+								READ_BYTE 0x18 itmflag1
+								READ_BYTE 0x60 itmenchant
+								PATCH_IF (itmflag1 & 0b01000000) = 0b01000000 BEGIN
+									SPRINT newdesc ~%newdesc%~^~%WNL%－魔法武器，附魔等级：%itmenchant%~
+								END ELSE BEGIN
+									SPRINT newdesc ~%newdesc%~^~%WNL%－非魔法武器，附魔等级：%itmenchant%~
+								END
+								READ_BYTE 0x19 itmflag2
+								PATCH_IF (itmflag2 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－材质：银~ END
+								PATCH_IF (itmflag2 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－材质：寒铁~ END
+								READ_SHORT (14 + abilityoffset + 0x38 * (itmability - 1)) abilityrange
+								SPRINT newdesc ~%newdesc%~^~%WNL%－射程：%abilityrange%~
+								READ_SHORT (18 + abilityoffset + 0x38 * (itmability - 1)) abilityspeed
+								SPRINT newdesc ~%newdesc%~^~%WNL%－出手时间：%abilityspeed%~
+								READ_SHORT (20 + abilityoffset + 0x38 * (itmability - 1)) abilitytohit
+								SPRINT newdesc ~%newdesc%~^~%WNL%－命中修正：%abilitytohit%~
+								READ_BYTE (22 + abilityoffset + 0x38 * (itmability - 1)) dicesize
+								READ_BYTE (24 + abilityoffset + 0x38 * (itmability - 1)) diceamount
+								READ_SHORT (26 + abilityoffset + 0x38 * (itmability - 1)) damagebonus
+								PATCH_IF damagebonus > 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%＋%damagebonus%~ END
+								PATCH_IF damagebonus < 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%%damagebonus%~ END
+								PATCH_IF damagebonus = 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%~ END
+								READ_BYTE (38 + abilityoffset + 0x38 * (itmability - 1)) abilityflag1
+								PATCH_IF (abilityflag1 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－命中和伤害受力量加成~ END
+								PATCH_IF (abilityflag1 & 0b00000100) = 0b00000100 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害受力量加成~ END
+								PATCH_IF (abilityflag1 & 0b00001000) = 0b00001000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－命中受力量加成~ END
+								READ_SHORT (28 + abilityoffset + 0x38 * (itmability - 1)) damagetype
+								PATCH_IF (damagetype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺~ END
+								PATCH_IF (damagetype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：钝击~ END
+								PATCH_IF (damagetype == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：挥砍~ END
+								PATCH_IF (damagetype == 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：远程~ END
+								PATCH_IF (damagetype == 5) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：拳头~ END
+								PATCH_IF (damagetype == 6) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺或钝击~ END
+								PATCH_IF (damagetype == 7) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺或挥砍~ END
+								PATCH_IF (damagetype == 8) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：钝击或挥砍~ END
+								READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
+								READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
+								PATCH_IF abilityeffects > 0 BEGIN
+									FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
+										LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+									END
+								END
+							END
+							
+						END
+					END
+				END
+
+				//是近战或投掷武器
+				PATCH_IF (itemtype == 16)||(itemtype == 17)||(itemtype == 19)||(itemtype == 20)||(itemtype == 21)||(itemtype == 22)||(itemtype == 23)||(itemtype == 24)||(itemtype == 25)||(itemtype == 26)||(itemtype == 28)||(itemtype == 29)||(itemtype == 30) BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%战斗能力资料补充：~	//准备修改战斗能力描述
+					READ_BYTE 0x31 abilityprof
+					PATCH_IF (abilityprof == 89) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：巨剑~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 90) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：长剑~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 91) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：短剑~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 92) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：战斧~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 93) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：双手剑~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 94) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：武士刀~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 95) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：弯刀／腰刀／忍者刀~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 96) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：匕首~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 97) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：战锤~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 98) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：长矛~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 99) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：战戟~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 100) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：链枷／流星锤~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 101) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：钉头锤~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 102) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：手杖~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 103) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：十字弓~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 104) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：长弓~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 105) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：短弓~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 106) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：飞镖锤~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 107) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：投石索~ SET addnum = addnum + 1 END
+					PATCH_IF (abilityprof == 115) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：棍棒~ SET addnum = addnum + 1 END
+					READ_BYTE 0x38 itmstack
+					PATCH_IF itmstack > 1 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%堆积上限：%itmstack%~ END					
+					READ_BYTE 0x18 itmflag1
+					READ_BYTE 0x60 itmenchant
+					PATCH_IF (itmflag1 & 0b01000000) = 0b01000000 BEGIN
+						SPRINT newdesc ~%newdesc%~^~%WNL%魔法武器，附魔等级：%itmenchant%~
+					END ELSE BEGIN
+						SPRINT newdesc ~%newdesc%~^~%WNL%非魔法武器，附魔等级：%itmenchant%~
+					END
+					READ_BYTE 0x19 itmflag2
+					PATCH_IF (itmflag2 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%材质：银~ END
+					PATCH_IF (itmflag2 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%材质：寒铁~ END					
+					READ_LONG 0x64 abilityoffset
+					READ_SHORT 0x68 abilityamount
+					PATCH_IF abilityamount > 0 BEGIN
+						FOR (itmability = 1 ; itmability < (abilityamount + 1) ; ++itmability) BEGIN	//遍历各个战斗能力
+							READ_BYTE (abilityoffset + 0x38 * (itmability - 1)) abilitytype
+							READ_BYTE (2 + abilityoffset + 0x38 * (itmability - 1)) abilitylocation
+							READ_BYTE (12 + abilityoffset + 0x38 * (itmability - 1)) abilitytarget
+							READ_BYTE (16 + abilityoffset + 0x38 * (itmability - 1)) launcherrequired
+							READ_SHORT (50 + abilityoffset + 0x38 * (itmability - 1)) isarrow
+							READ_SHORT (52 + abilityoffset + 0x38 * (itmability - 1)) isbolt
+							READ_SHORT (54 + abilityoffset + 0x38 * (itmability - 1)) isbullet
+							
+							//PATCH_IF ((abilitytype == 2)&&(abilitylocation == 1)&&(abilitytarget == 1)&&(launcherrequired == 0)&&!(isarrow||isbolt||isbullet)) BEGIN
+							PATCH_IF ((abilitytype == 2)&&(abilitylocation == 1)) BEGIN
+								SET addnum = addnum + 1
+								SPRINT newdesc ~%newdesc%~^~%WNL%远程能力（投掷）：~
+								READ_SHORT (14 + abilityoffset + 0x38 * (itmability - 1)) abilityrange
+								SPRINT newdesc ~%newdesc%~^~%WNL%－射程：%abilityrange%~
+								READ_SHORT (18 + abilityoffset + 0x38 * (itmability - 1)) abilityspeed
+								SPRINT newdesc ~%newdesc%~^~%WNL%－出手时间：%abilityspeed%~
+								READ_SHORT (20 + abilityoffset + 0x38 * (itmability - 1)) abilitytohit
+								SPRINT newdesc ~%newdesc%~^~%WNL%－命中修正：%abilitytohit%~
+								READ_BYTE (22 + abilityoffset + 0x38 * (itmability - 1)) dicesize
+								READ_BYTE (24 + abilityoffset + 0x38 * (itmability - 1)) diceamount
+								READ_SHORT (26 + abilityoffset + 0x38 * (itmability - 1)) damagebonus
+								PATCH_IF damagebonus > 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%＋%damagebonus%~ END
+								PATCH_IF damagebonus < 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%%damagebonus%~ END
+								PATCH_IF damagebonus = 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%~ END
+								READ_BYTE (38 + abilityoffset + 0x38 * (itmability - 1)) abilityflag1
+								PATCH_IF (abilityflag1 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－命中和伤害受力量加成~ END
+								PATCH_IF (abilityflag1 & 0b00000100) = 0b00000100 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害受力量加成~ END
+								PATCH_IF (abilityflag1 & 0b00001000) = 0b00001000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－命中受力量加成~ END
+								READ_SHORT (28 + abilityoffset + 0x38 * (itmability - 1)) damagetype
+								PATCH_IF (damagetype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺~ END
+								PATCH_IF (damagetype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：钝击~ END
+								PATCH_IF (damagetype == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：挥砍~ END
+								PATCH_IF (damagetype == 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：远程~ END
+								PATCH_IF (damagetype == 5) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：拳头~ END
+								PATCH_IF (damagetype == 6) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺或钝击~ END
+								PATCH_IF (damagetype == 7) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺或挥砍~ END
+								PATCH_IF (damagetype == 8) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：钝击或挥砍~ END
+								READ_SHORT (34 + abilityoffset + 0x38 * (itmability - 1)) maxcharge
+								PATCH_IF (maxcharge == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－自动飞回~ END
+								READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
+								READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
+								PATCH_IF abilityeffects > 0 BEGIN
+									FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
+										LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+									END
+								END
+							END
+							
+							//PATCH_IF ((abilitytype == 1)&&(abilitylocation == 1)&&(abilitytarget == 1)&&(launcherrequired == 0)) BEGIN
+							PATCH_IF ((abilitytype == 1)&&(abilitylocation == 1)) BEGIN
+								SET addnum = addnum + 1
+								SPRINT newdesc ~%newdesc%~^~%WNL%近战能力：~
+								READ_SHORT (14 + abilityoffset + 0x38 * (itmability - 1)) abilityrange
+								SPRINT newdesc ~%newdesc%~^~%WNL%－攻击距离：%abilityrange%~
+								READ_SHORT (18 + abilityoffset + 0x38 * (itmability - 1)) abilityspeed
+								SPRINT newdesc ~%newdesc%~^~%WNL%－出手时间：%abilityspeed%~
+								READ_SHORT (20 + abilityoffset + 0x38 * (itmability - 1)) abilitytohit
+								SPRINT newdesc ~%newdesc%~^~%WNL%－命中修正：%abilitytohit%~
+								READ_BYTE (22 + abilityoffset + 0x38 * (itmability - 1)) dicesize
+								READ_BYTE (24 + abilityoffset + 0x38 * (itmability - 1)) diceamount
+								READ_SHORT (26 + abilityoffset + 0x38 * (itmability - 1)) damagebonus
+								PATCH_IF damagebonus > 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%＋%damagebonus%~ END
+								PATCH_IF damagebonus < 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%%damagebonus%~ END
+								PATCH_IF damagebonus = 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害：%diceamount%D%dicesize%~ END
+								READ_BYTE (38 + abilityoffset + 0x38 * (itmability - 1)) abilityflag1
+								PATCH_IF (abilityflag1 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－命中和伤害受力量加成~ END
+								PATCH_IF (abilityflag1 & 0b00000100) = 0b00000100 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害受力量加成~ END
+								PATCH_IF (abilityflag1 & 0b00001000) = 0b00001000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－命中受力量加成~ END
+								READ_SHORT (28 + abilityoffset + 0x38 * (itmability - 1)) damagetype
+								PATCH_IF (damagetype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺~ END
+								PATCH_IF (damagetype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：钝击~ END
+								PATCH_IF (damagetype == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：挥砍~ END
+								PATCH_IF (damagetype == 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：远程~ END
+								PATCH_IF (damagetype == 5) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：拳头~ END
+								PATCH_IF (damagetype == 6) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺或钝击~ END
+								PATCH_IF (damagetype == 7) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：穿刺或挥砍~ END
+								PATCH_IF (damagetype == 8) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－伤害类型：钝击或挥砍~ END
+								READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
+								READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
+								PATCH_IF abilityeffects > 0 BEGIN
+									FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
+										LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+									END
+								END
+							END	//近战能力
+
+						END	//遍历各个能力
+					END	//装备存在能力
+				END	//是近战或投掷武器
+				
+				
+				//是任意物品
+				PATCH_IF (itemtype != 5)&&(itemtype != 8)&&(itemtype != 14)&&(itemtype != 31)&&(itemtype != 33)&&(itemtype != 34)&&(itemtype != 36)&&(itemtype != 37)&&(itemtype != 38) BEGIN
+					//SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%战斗能力资料补充：~	//准备修改物品能力描述
+
+					READ_BYTE 0x38 itmstack
+					PATCH_IF (itmstack > 1)&&(~%newdesc%~ STRING_CONTAINS_REGEXP ~堆积上限~) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%堆积上限：%itmstack%~ END
+					READ_LONG 0x64 abilityoffset
+					READ_SHORT 0x68 abilityamount
+					PATCH_IF abilityamount > 0 BEGIN
+						FOR (itmability = 1 ; itmability < (abilityamount + 1) ; ++itmability) BEGIN	//遍历各个物品能力
+							READ_BYTE (abilityoffset + 0x38 * (itmability - 1)) abilitytype
+							READ_BYTE (2 + abilityoffset + 0x38 * (itmability - 1)) abilitylocation
+							READ_BYTE (12 + abilityoffset + 0x38 * (itmability - 1)) abilitytarget
+							
+							PATCH_IF ((abilitytype == 3)&&(abilitylocation == 3)) BEGIN
+								SET addnum = addnum + 1
+								SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%物品能力资料补充：~
+								PATCH_IF abilitytarget == 1 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－目标：活动生物~ END
+								PATCH_IF abilitytarget == 3 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－目标：活动生物（忽略距离）~ END
+								PATCH_IF abilitytarget == 4 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－目标：有效距离内任意位置~ END
+								PATCH_IF abilitytarget == 5 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－目标：自身~ END
+								PATCH_IF abilitytarget == 7 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－目标：自身（无使用间隔）~ END						
+								READ_SHORT (14 + abilityoffset + 0x38 * (itmability - 1)) abilityrange
+								SPRINT newdesc ~%newdesc%~^~%WNL%－有效距离：%abilityrange%~
+								READ_SHORT (18 + abilityoffset + 0x38 * (itmability - 1)) abilityspeed
+								SPRINT newdesc ~%newdesc%~^~%WNL%－施展时间：%abilityspeed%~
+								
+								READ_SHORT (34 + abilityoffset + 0x38 * (itmability - 1)) maxcharge
+								PATCH_IF (maxcharge == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－无限使用~ END
+								ELSE BEGIN
+									READ_SHORT (36 + abilityoffset + 0x38 * (itmability - 1)) abilityusedup
+									READ_BYTE (39 + abilityoffset + 0x38 * (itmability - 1)) abilityflag2
+									PATCH_IF (abilityusedup == 0)||(abilityusedup > 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－次数用完不消失~ END
+									PATCH_IF (abilityusedup == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－次数用完消失~ END
+									PATCH_IF (abilityusedup == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－次数用完被替换~ END								
+									PATCH_IF ((abilityflag2 & 0b00001000) = 0b00001000) BEGIN SPRINT newdesc ~%newdesc%~^~，休息自动充能~ END
+
+								END
+								
+								READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
+								READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
+								PATCH_IF abilityeffects > 0 BEGIN
+									FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
+										LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+									END
+								END
+							END	//物品能力
+
+						END	//遍历各个能力
+					END	//装备存在能力
+				END	//不是无能力物品
+			
+				PATCH_IF addnum > 0 BEGIN SAY_EVALUATED 0x54 ~%newdesc%~ END
+				
+			END	//描述文字有效
+		END	//有描述文字
+	END	//是正常物品文件
+BUT_ONLY
