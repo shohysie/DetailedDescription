@@ -1238,10 +1238,10 @@ BEGIN
 		INNER_ACTION BEGIN
 			ACTION_IF FILE_EXISTS_IN_GAME ~%readspellres%.itm~ BEGIN
 				COPY_EXISTING ~%readspellres%.itm~ ~override~
-					READ_LONG 0x08 crenameref
-					PATCH_IF (crenameref >= 0 && crenameref < 2147483646) BEGIN
-						READ_STRREF 0x08 crenamestr
-						SPRINT newdesc ~%newdesc%~^~%WNL%－产生魔法武器：%crenamestr%，数量%readamount%~
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
+						READ_STRREF 0x08 namestr
+						SPRINT newdesc ~%newdesc%~^~%WNL%－产生魔法武器：%namestr%，数量%readamount%~
 						SET descfixed = 1
 					END
 				BUT_ONLY
@@ -1369,11 +1369,11 @@ BEGIN
 		INNER_ACTION BEGIN
 			ACTION_IF FILE_EXISTS_IN_GAME ~%readspellres%.cre~ BEGIN
 				COPY_EXISTING ~%readspellres%.cre~ ~override~
-					READ_LONG 0x08 crenameref
-					PATCH_IF (crenameref >= 0 && crenameref < 2147483646) BEGIN
-						READ_STRREF 0x08 crenamestr
-						PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为%crenamestr%（数值和外形均改变）~ SET descfixed = 1 END
-						PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为%crenamestr%（仅外形改变）~ SET descfixed = 1 END
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
+						READ_STRREF 0x08 namestr
+						PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为%namestr%（数值和外形均改变）~ SET descfixed = 1 END
+						PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为%namestr%（仅外形改变）~ SET descfixed = 1 END
 					END
 				BUT_ONLY
 			END
@@ -1458,13 +1458,13 @@ BEGIN
 		INNER_ACTION BEGIN
 			ACTION_IF FILE_EXISTS_IN_GAME ~%readspellres%.spl~ BEGIN
 				COPY_EXISTING ~%readspellres%.spl~ ~override~
-					READ_LONG 0x08 spldescref
-					PATCH_IF (spldescref >= 0 && spldescref < 2147483646) BEGIN
-						READ_STRREF 0x08 spldesc
-						PATCH_IF (readamount == 0)&&(readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以人物等级施法：%spldesc%~ SET descfixed = 1 END
-						PATCH_IF (readamount != 0)&&(readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%施法：%spldesc%~ SET descfixed = 1 END
-						PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以人物等级瞬间施法：%spldesc%~ SET descfixed = 1 END
-						PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%瞬间施法：%spldesc%~ SET descfixed = 1 END
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
+						READ_STRREF 0x08 namestr
+						PATCH_IF (readamount == 0)&&(readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以人物等级施法：%namestr%~ SET descfixed = 1 END
+						PATCH_IF (readamount != 0)&&(readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%施法：%namestr%~ SET descfixed = 1 END
+						PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以人物等级瞬间施法：%namestr%~ SET descfixed = 1 END
+						PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%瞬间施法：%namestr%~ SET descfixed = 1 END
 					END
 				BUT_ONLY
 			END
@@ -1486,10 +1486,10 @@ BEGIN
 		INNER_ACTION BEGIN
 			ACTION_IF FILE_EXISTS_IN_GAME ~%readspellres%.spl~ BEGIN
 				COPY_EXISTING ~%readspellres%.spl~ ~override~
-					READ_LONG 0x08 spldescref
-					PATCH_IF (spldescref >= 0 && spldescref < 2147483646) BEGIN
-						READ_STRREF 0x08 spldesc
-						SPRINT newdesc ~%newdesc%~^~%WNL%－学习法术：%spldesc%~
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
+						READ_STRREF 0x08 namestr
+						SPRINT newdesc ~%newdesc%~^~%WNL%－学习法术：%namestr%~
 						SET descfixed = 1
 					END
 				BUT_ONLY
@@ -1506,11 +1506,11 @@ BEGIN
 		INNER_ACTION BEGIN
 			ACTION_IF FILE_EXISTS_IN_GAME ~%readspellres%.spl~ BEGIN
 				COPY_EXISTING ~%readspellres%.spl~ ~override~
-					READ_LONG 0x08 spldescref
-					PATCH_IF (spldescref >= 0 && spldescref < 2147483646) BEGIN
-						READ_STRREF 0x08 spldesc
-						PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%向目的地施法：%spldesc%~ SET descfixed = 1 END
-						PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－瞬间向目的地施法：%spldesc%~ SET descfixed = 1 END
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
+						READ_STRREF 0x08 namestr
+						PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%向目的地施法：%namestr%~ SET descfixed = 1 END
+						PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－瞬间向目的地施法：%namestr%~ SET descfixed = 1 END
 					END
 				BUT_ONLY
 			END
@@ -1670,10 +1670,10 @@ BEGIN
 		INNER_ACTION BEGIN
 			ACTION_IF FILE_EXISTS_IN_GAME ~%readspellres%.spl~ BEGIN
 				COPY_EXISTING ~%readspellres%.spl~ ~override~
-					READ_LONG 0x08 spldescref
-					PATCH_IF (spldescref >= 0 && spldescref < 2147483646) BEGIN
-						READ_STRREF 0x08 spldesc
-						SPRINT newdesc ~%newdesc%~^~%WNL%－获得能力或法术：%spldesc%~
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
+						READ_STRREF 0x08 namestr
+						SPRINT newdesc ~%newdesc%~^~%WNL%－获得能力或法术：%namestr%~
 						SET descfixed = 1
 					END
 				BUT_ONLY
@@ -1688,10 +1688,10 @@ BEGIN
 		INNER_ACTION BEGIN
 			ACTION_IF FILE_EXISTS_IN_GAME ~%readspellres%.spl~ BEGIN
 				COPY_EXISTING ~%readspellres%.spl~ ~override~
-					READ_LONG 0x08 spldescref
-					PATCH_IF (spldescref >= 0 && spldescref < 2147483646) BEGIN
-						READ_STRREF 0x08 spldesc
-						SPRINT newdesc ~%newdesc%~^~%WNL%－失去能力或法术：%spldesc%~
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
+						READ_STRREF 0x08 namestr
+						SPRINT newdesc ~%newdesc%~^~%WNL%－失去能力或法术：%namestr%~
 						SET descfixed = 1
 					END
 				BUT_ONLY
@@ -1941,10 +1941,10 @@ BEGIN
 		INNER_ACTION BEGIN
 			ACTION_IF FILE_EXISTS_IN_GAME ~%readspellres%.spl~ BEGIN
 				COPY_EXISTING ~%readspellres%.spl~ ~override~
-					READ_LONG 0x08 crenameref
-					PATCH_IF (crenameref >= 0 && crenameref < 2147483646) BEGIN
-						READ_STRREF 0x08 spldesc
-						SPRINT newdesc ~%newdesc%~^~%WNL%－防护法术：%crenamestr%~
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
+						READ_STRREF 0x08 namestr
+						SPRINT newdesc ~%newdesc%~^~%WNL%－防护法术：%namestr%~
 						PATCH_IF NOT (~%readspellres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~（法师）~ END
 						PATCH_IF NOT (~%readspellres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~（牧师）~ END
 						SET descfixed = 1
@@ -1967,10 +1967,10 @@ BEGIN
 		INNER_ACTION BEGIN
 			ACTION_IF FILE_EXISTS_IN_GAME ~%readspellres%.spl~ BEGIN
 				COPY_EXISTING ~%readspellres%.spl~ ~override~
-					READ_LONG 0x08 crenameref
-					PATCH_IF (crenameref >= 0 && crenameref < 2147483646) BEGIN
-						READ_STRREF 0x08 spldesc
-						SPRINT newdesc ~%newdesc%~^~%WNL%－反弹法术：%crenamestr%~
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
+						READ_STRREF 0x08 namestr
+						SPRINT newdesc ~%newdesc%~^~%WNL%－反弹法术：%namestr%~
 						PATCH_IF NOT (~%readspellres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~（法师）~ END
 						PATCH_IF NOT (~%readspellres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~（牧师）~ END
 						SET descfixed = 1
@@ -3555,10 +3555,10 @@ BEGIN
 		INNER_ACTION BEGIN
 			ACTION_IF FILE_EXISTS_IN_GAME ~%readspellres%.spl~ BEGIN
 				COPY_EXISTING ~%readspellres%.spl~ ~override~
-					READ_LONG 0x08 spldescref
-					PATCH_IF (spldescref >= 0 && spldescref < 2147483646) && (readtimemode == 2) BEGIN
-						READ_STRREF 0x08 spldesc
-						SPRINT newdesc ~%newdesc%~^~%WNL%防护法术：%spldesc%~
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) && (readtimemode == 2) BEGIN
+						READ_STRREF 0x08 namestr
+						SPRINT newdesc ~%newdesc%~^~%WNL%防护法术：%namestr%~
 						PATCH_IF NOT (~%readspellres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~（法师）~ END
 						PATCH_IF NOT (~%readspellres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~（牧师）~ END
 					END
