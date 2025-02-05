@@ -1241,9 +1241,12 @@ BEGIN
 					READ_LONG 0x08 nameref
 					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
 						READ_STRREF 0x08 namestr
-						SPRINT newdesc ~%newdesc%~^~%WNL%－产生魔法武器：%namestr%，数量%readamount%~
-						SET descfixed = 1
+						PATCH_IF NOT (~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~) BEGIN SPRINT namestr ~未知武器~ END
+					END ELSE BEGIN
+						SPRINT namestr ~未知武器~
 					END
+					SPRINT newdesc ~%newdesc%~^~%WNL%－产生魔法武器：%namestr%，数量%readamount%~
+					SET descfixed = 1
 				BUT_ONLY
 			END
 		END
@@ -1372,9 +1375,12 @@ BEGIN
 					READ_LONG 0x08 nameref
 					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
 						READ_STRREF 0x08 namestr
-						PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为%namestr%（数值和外形均改变）~ SET descfixed = 1 END
-						PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为%namestr%（仅外形改变）~ SET descfixed = 1 END
+						PATCH_IF NOT (~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~) BEGIN SPRINT namestr ~未知生物~ END
+					END ELSE BEGIN
+						SPRINT namestr ~未知生物~
 					END
+					PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为：%namestr%（数值和外形均改变）~ SET descfixed = 1 END
+					PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为：%namestr%（仅外形改变）~ SET descfixed = 1 END
 				BUT_ONLY
 			END
 		END
@@ -1461,11 +1467,14 @@ BEGIN
 					READ_LONG 0x08 nameref
 					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
 						READ_STRREF 0x08 namestr
-						PATCH_IF (readamount == 0)&&(readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以人物等级施法：%namestr%~ SET descfixed = 1 END
-						PATCH_IF (readamount != 0)&&(readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%施法：%namestr%~ SET descfixed = 1 END
-						PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以人物等级瞬间施法：%namestr%~ SET descfixed = 1 END
-						PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%瞬间施法：%namestr%~ SET descfixed = 1 END
+						PATCH_IF NOT (~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~) BEGIN SPRINT namestr ~未知法术~ END
+					END ELSE BEGIN
+						SPRINT namestr ~未知法术~
 					END
+					PATCH_IF (readamount == 0)&&(readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以人物等级施法：%namestr%~ SET descfixed = 1 END
+					PATCH_IF (readamount != 0)&&(readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%施法：%namestr%~ SET descfixed = 1 END
+					PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以人物等级瞬间施法：%namestr%~ SET descfixed = 1 END
+					PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%瞬间施法：%namestr%~ SET descfixed = 1 END
 				BUT_ONLY
 			END
 		END
@@ -1489,9 +1498,12 @@ BEGIN
 					READ_LONG 0x08 nameref
 					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
 						READ_STRREF 0x08 namestr
-						SPRINT newdesc ~%newdesc%~^~%WNL%－学习法术：%namestr%~
-						SET descfixed = 1
+						PATCH_IF NOT (~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~) BEGIN SPRINT namestr ~未知法术~ END
+					END ELSE BEGIN
+						SPRINT namestr ~未知法术~
 					END
+					SPRINT newdesc ~%newdesc%~^~%WNL%－学习法术：%namestr%~
+					SET descfixed = 1
 				BUT_ONLY
 			END
 		END
@@ -1509,9 +1521,12 @@ BEGIN
 					READ_LONG 0x08 nameref
 					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
 						READ_STRREF 0x08 namestr
-						PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%向目的地施法：%namestr%~ SET descfixed = 1 END
-						PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－瞬间向目的地施法：%namestr%~ SET descfixed = 1 END
+						PATCH_IF NOT (~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~) BEGIN SPRINT namestr ~未知法术~ END
+					END ELSE BEGIN
+						SPRINT namestr ~未知法术~
 					END
+					PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%向目的地施法：%namestr%~ SET descfixed = 1 END
+					PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－瞬间向目的地施法：%namestr%~ SET descfixed = 1 END
 				BUT_ONLY
 			END
 		END
@@ -1673,9 +1688,12 @@ BEGIN
 					READ_LONG 0x08 nameref
 					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
 						READ_STRREF 0x08 namestr
-						SPRINT newdesc ~%newdesc%~^~%WNL%－获得能力或法术：%namestr%~
-						SET descfixed = 1
+						PATCH_IF NOT (~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~) BEGIN SPRINT namestr ~未知法术~ END
+					END ELSE BEGIN
+						SPRINT namestr ~未知法术~
 					END
+					SPRINT newdesc ~%newdesc%~^~%WNL%－获得能力或法术：%namestr%~
+					SET descfixed = 1
 				BUT_ONLY
 			END
 		END
@@ -2701,7 +2719,7 @@ BEGIN
 	PATCH_IF opcode == 301 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (firsteff + peffect - 1)) readamount
 		READ_BYTE (8 + effoffset + 0x30 * (firsteff + peffect - 1)) readtype
-		READ_BYTE (44 + effoffset + 0x30 * (firsteff + peffect - 1)) readspecial
+		READ_LONG (44 + effoffset + 0x30 * (firsteff + peffect - 1)) readspecial
 		SET descfixed = 0
 		PATCH_IF (readspecial == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%~ SET descfixed = 1 END
 		PATCH_IF (readspecial == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%近战武器~ SET descfixed = 1 END
@@ -2870,6 +2888,8 @@ BEGIN
 	SPRINT newdesc ~%pdesc%~
 	READ_LONG 0x6a effoffset
 	READ_SHORT (effoffset + 0x30 * (peffect - 1)) opcode
+	//PATCH_PRINT ~effoffset=%effoffset%~
+	//PATCH_PRINT ~opcode=%opcode%~
 	
 	PATCH_IF opcode == 0 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (peffect - 1)) readamount
@@ -3062,6 +3082,7 @@ BEGIN
 		READ_BYTE (12 + effoffset + 0x30 * (peffect - 1)) readtimemode
 		PATCH_IF (readamount == 1) && (readtype == 0) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%法师1级法术记忆数量翻倍~ SET addnum = pnum + 1 END
 		PATCH_IF (readamount != 1) && (readtype == 0) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%法师%readamount%级及以下法术记忆数量翻倍~ SET addnum = pnum + 1 END
+		PATCH_IF (readamount > 60000) BEGIN SET readamount = (65536 - readamount) END
 		PATCH_IF ((readtype & 0b0000000000000001) = 0b0000000000000001) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%法师1级法术记忆数量修正：%readamount%~ SET addnum = pnum + 1 END
 		PATCH_IF ((readtype & 0b0000000000000010) = 0b0000000000000010) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%法师2级法术记忆数量修正：%readamount%~ SET addnum = pnum + 1 END
 		PATCH_IF ((readtype & 0b0000000000000100) = 0b0000000000000100) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%法师3级法术记忆数量修正：%readamount%~ SET addnum = pnum + 1 END
@@ -3578,6 +3599,52 @@ BEGIN
 		PATCH_IF (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%最小HP限制：%readamount%~ SET addnum = pnum + 1 END
 	END
 	
+	PATCH_IF opcode == 232 BEGIN
+		READ_LONG (4 + effoffset + 0x30 * (peffect - 1)) readamount
+		READ_LONG (8 + effoffset + 0x30 * (peffect - 1)) readtype
+		READ_BYTE (12 + effoffset + 0x30 * (peffect - 1)) readtimemode
+		READ_LONG (44 + effoffset + 0x30 * (peffect - 1)) readspecial
+		SET descfixed = 0
+		PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%被打中时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%玩家遇敌时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%HP小于50％时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%HP小于25％时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%HP小于10％时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%自身无助时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%自身中毒时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%受攻击时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%有生物进入4'内~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%有生物进入10'内~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%受到伤害时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 12) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%杀死生物时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 13) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%特定时段~ SET descfixed = 1 END
+		PATCH_IF (readtype == 14) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%有生物进入%readspecial%'内~ SET descfixed = 1 END
+		PATCH_IF (readtype == 15) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%有生物处于特定状态时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 16) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%自身死亡时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 17) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%有生物死亡时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 18) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%被超度时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 19) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%HP小于%readspecial%时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 20) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%HP小于%readspecial%％时~ SET descfixed = 1 END
+		PATCH_IF (readtype == 21) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%自身处于特定状态时~ SET descfixed = 1 END
+		INNER_ACTION BEGIN
+			ACTION_IF (FILE_EXISTS_IN_GAME ~%readspellres%.spl~) && (descfixed == 1)  BEGIN
+				COPY_EXISTING ~%readspellres%.spl~ ~override~
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN
+						READ_STRREF 0x08 namestr
+						PATCH_IF NOT (~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~) BEGIN SPRINT namestr ~未知法术~ END
+					END ELSE BEGIN
+						SPRINT namestr ~未知法术~
+					END
+					PATCH_IF (descfixed = 2) && (readamount == 0) BEGIN SPRINT newdesc ~%newdesc%~^~，对自身施展：%namestr%~ SET addnum = pnum + 1 END
+					PATCH_IF (descfixed = 2) && (readamount == 1) BEGIN SPRINT newdesc ~%newdesc%~^~，对最后攻击者施展：%namestr%~ SET addnum = pnum + 1 END
+					PATCH_IF (descfixed = 2) && (readamount == 2) BEGIN SPRINT newdesc ~%newdesc%~^~，（仅限玩家）对最近的敌人施展：%namestr%~ SET addnum = pnum + 1 END
+					PATCH_IF (descfixed = 2) && (readamount == 3) BEGIN SPRINT newdesc ~%newdesc%~^~，对最近的对象施展：%namestr%~ SET addnum = pnum + 1 END
+				BUT_ONLY
+			END
+		END
+	END
+	
 	PATCH_IF opcode == 233 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (peffect - 1)) readamount
 		READ_LONG (8 + effoffset + 0x30 * (peffect - 1)) readtype
@@ -3818,20 +3885,23 @@ BEGIN
 		READ_LONG (8 + effoffset + 0x30 * (peffect - 1)) readtype
 		READ_BYTE (12 + effoffset + 0x30 * (peffect - 1)) readtimemode
 		READ_LONG (44 + effoffset + 0x30 * (peffect - 1)) readspecial
-		PATCH_IF (readspecial == 0) && (readtimemode == 2) BEGIN SET readtype = 3 END
-		PATCH_IF (readspecial == 1) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对防护系~ END
-		PATCH_IF (readspecial == 2) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对咒法系~ END
-		PATCH_IF (readspecial == 3) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对预言系~ END
-		PATCH_IF (readspecial == 4) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对附魔系~ END
-		PATCH_IF (readspecial == 5) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对幻术系~ END
-		PATCH_IF (readspecial == 6) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对塑能系~ END
-		PATCH_IF (readspecial == 7) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对死灵系~ END
-		PATCH_IF (readspecial == 8) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对改变系~ END
-		PATCH_IF (readspecial == 9) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对所有系~ END
-		PATCH_IF (readspecial == 10) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对狂乱系~ END		
-		PATCH_IF (readtype == 0) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~的豁免修正：%readamount%~ SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 1) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~的豁免设为：%readamount%~ SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 2) && (readtimemode == 2) BEGIN SPRINT newdesc ~%newdesc%~^~的豁免设为当前的%readamount%％~ SET addnum = pnum + 1 END
+		SET descfixed = 0
+		PATCH_IF (readspecial == 0) BEGIN SET readtype = 3 END
+		PATCH_IF (readspecial == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对防护系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对咒法系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对预言系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对附魔系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 5) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对幻术系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 6) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对塑能系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 7) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对死灵系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 8) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对改变系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 9) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对所有系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 10) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%对狂乱系~ SET descfixed = 1 END	
+		PATCH_IF (descfixed == 1) && (readtimemode == 2) BEGIN
+			PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~的豁免修正：%readamount%~ SET addnum = pnum + 1 END
+			PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~的豁免设为：%readamount%~ SET addnum = pnum + 1 END
+			PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~的豁免设为当前的%readamount%％~ SET addnum = pnum + 1 END
+		END
 	END
 
 END
