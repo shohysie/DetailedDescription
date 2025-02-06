@@ -5,6 +5,8 @@ Only has a Chinese version.
 
 
 Version History 
+v0.3
+可以对法术进行补充说明
 v0.2
 对原本无描述的物品会自动新建一份描述
 修正一些负值显示为6553x的情况

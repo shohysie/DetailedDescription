@@ -2,25 +2,31 @@ BACKUP ~DetailedDescription/backup~
 AUTHOR ~shohy@126.com~
 VERSION ~v0.2~
 
+ALWAYS
+	INCLUDE ~DetailedDescription/lib/desfunctions.tpa~
+END
+
 BEGIN ~物品增加详细说明~
-INCLUDE ~DetailedDescription/lib/desfunctions.tpa~
 
 COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
-//COPY_EXISTING ~BOW05.ITM~ ~override~ 	~AX1H02.ITM~ ~override~
+//COPY_EXISTING ~BOW05.ITM~ ~override~ 	~AX1H09.ITM~ ~override~
 	PATCH_IF (SOURCE_SIZE > 0x71) BEGIN
 		READ_SHORT 0x1c itemtype
 		READ_LONG 0x54 iddescref
 		READ_STRREF 0x54 iddesc
+		//PATCH_PRINT ~iddescref=%iddesc%~
 		PATCH_IF NOT (iddescref >= 0 && iddescref < 2147483646) BEGIN	//已鉴定描述不在范围内，换未鉴定描述
 			READ_LONG 0x50 iddescref
 			READ_STRREF 0x50 iddesc
-			PATCH_IF NOT (iddescref >= 0 && iddescref < 2147483646) BEGIN	//未鉴定描述还是没有，新建一个
+			//PATCH_PRINT ~niddescref=%iddesc%~
+			PATCH_IF NOT (iddescref >= 0 && iddescref < 2147483646) BEGIN	//未鉴定描述还是没有，新建一个	
 				SPRINT iddesc ~物品原本无描述~
+				//PATCH_PRINT ~nniddescref=%iddesc%~
 			END
 		END
 		
 		//去除所有中文文本空格			
-		PATCH_IF ~%iddesc%~ STRING_CONTAINS_REGEXP ~Invalid Strref~ BEGIN
+		PATCH_IF ~%iddesc%~ STRING_CONTAINS_REGEXP ~Invalid Strref~ BEGIN	//STRING_CONTAINS_REGEXP结果是1表示不包含
 			INNER_PATCH_SAVE newdesc ~%iddesc%~ BEGIN	//修改文本
 				REPLACE_TEXTUALLY ~ +~ ~~
 				//REPLACE_TEXTUALLY ~^ +- +\(.+\)$~ ~－\1~
@@ -28,6 +34,7 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 			END
 		END ELSE BEGIN
 			SPRINT newdesc ~物品原本无描述~
+			//PATCH_PRINT ~nnniddescref=%newdesc%~
 		END
 		
 		SET controlnum = (~%newdesc%~ STRING_COMPARE ~%iddesc%~)	//相等为0，不相等削过空格为1
@@ -45,12 +52,14 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 			READ_SHORT 0x70 effectamount
 			PATCH_IF effectamount > 0 BEGIN
 				FOR (itmeffect = 1 ; itmeffect < (effectamount + 1) ; ++itmeffect) BEGIN	//遍历各个效果
-					LPF CHECK_EQUIP_EFFECT INT_VAR peffect = itmeffect pnum = addnum STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc addnum END
+					LPF CHECK_EQUIP_EFFECT INT_VAR effectnum = itmeffect pnum = addnum STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc addnum END
 				END
 			END
 		END
 		PATCH_IF addnum == 0 BEGIN SPRINT newdesc ~%iddesc%~ SET addnum = controlnum END	//装备能力完全没有，还原备份去掉“装备能力资料补充”。削过空格值变1表示后面要写入
-		
+
+		//PATCH_PRINT ~descref=%newdesc%~
+	
 		//是弹药
 		PATCH_IF (itemtype == 5)||(itemtype == 14)||(itemtype == 31) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%战斗能力资料补充：~	//准备修改战斗能力描述
@@ -103,11 +112,13 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (34 + abilityoffset + 0x38 * (itmability - 1)) maxcharge
 						PATCH_IF (maxcharge == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－无限使用~ END
 						//READ_SHORT (36 + abilityoffset + 0x38 * (itmability - 1)) abilityusedup
-						READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
-						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
+						READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects	//第itmability个能力有几个eff，# effects
+						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st		//第一个eff是总eff的第几个（从第0个开始），前面的要不是装备eff要不是上一个能力的eff
+						//READ_LONG 0x6a effoffset
+						//eff1stoffset = effoffset + 0x30 * (abilityeff1st - 1)	//计算第itmability个能力第一个eff的初始地址
 						PATCH_IF abilityeffects > 0 BEGIN
-							FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
 							END
 						END
 						
@@ -173,8 +184,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
 						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
 						PATCH_IF abilityeffects > 0 BEGIN
-							FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
 							END
 						END
 					END
@@ -222,8 +233,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
 						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
 						PATCH_IF abilityeffects > 0 BEGIN
-							FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
 							END
 						END
 					END
@@ -316,8 +327,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
 						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
 						PATCH_IF abilityeffects > 0 BEGIN
-							FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
 							END
 						END
 					END
@@ -355,8 +366,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
 						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
 						PATCH_IF abilityeffects > 0 BEGIN
-							FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
 							END
 						END
 					END	//近战能力
@@ -408,8 +419,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (30 + abilityoffset + 0x38 * (itmability - 1)) abilityeffects
 						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
 						PATCH_IF abilityeffects > 0 BEGIN
-							FOR (attackeffect = 1 ; attackeffect < (abilityeffects + 1) ; ++attackeffect) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR pability = itmability peffect = attackeffect STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
 							END
 						END
 					END	//物品能力
@@ -422,3 +433,219 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 				
 	END	//是正常物品文件
 BUT_ONLY
+
+
+BEGIN ~已注册法术增加详细说明（随等级成长的法术只显示最低级和最高级的效果）~
+
+COPY_EXISTING ~SPELL.ids~ ~override~
+	COUNT_2DA_ROWS 2 rows
+	FOR (index = 1 ; index < rows ; ++index) BEGIN
+		READ_2DA_ENTRY index 0 2 splnum
+		READ_2DA_ENTRY index 1 2 splcode
+		PATCH_IF (splnum >= 1000) && (splnum < 5000) BEGIN
+			PATCH_IF (splnum >= 1000) && (splnum < 2000) BEGIN splnum = (splnum -1000) SPRINT splfilename ~SPPR%splnum%~ END
+			PATCH_IF (splnum >= 2000) && (splnum < 3000) BEGIN splnum = (splnum -2000) SPRINT splfilename ~SPWI%splnum%~ END
+			PATCH_IF (splnum >= 3000) && (splnum < 4000) BEGIN splnum = (splnum -3000) SPRINT splfilename ~SPIN%splnum%~ END
+			PATCH_IF (splnum >= 4000) && (splnum < 5000) BEGIN splnum = (splnum -4000) SPRINT splfilename ~SPCL%splnum%~ END
+			PATCH_IF FILE_EXISTS_IN_GAME ~%splfilename%.spl~ BEGIN
+				INNER_ACTION BEGIN
+
+					COPY_EXISTING ~%splfilename%.spl~ ~override~
+					//COPY_EXISTING ~SPWI921.SPL~ ~override~ ~SPWI925.SPL~ ~override~
+						READ_LONG 0x50 spldescref
+						PATCH_IF NOT (spldescref >= 0 && spldescref < 2147483646) BEGIN
+							SPRINT spldesc ~法术原本无描述~
+						END ELSE BEGIN 
+							READ_STRREF 0x50 spldesc
+							PATCH_IF NOT ~%spldesc%~ STRING_CONTAINS_REGEXP ~Invalid Strref~ BEGIN
+								SPRINT spldesc ~法术原本无描述~
+							END
+						END
+					//PATCH_PRINT ~%spldesc%~
+						SPRINT newdesc ~%spldesc%~^~%WNL%%WNL%法术基础特性补充描述：~
+						READ_BYTE 0x19 splflag2
+						PATCH_IF (splflag2 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%终止隐形和圣域~ END
+						PATCH_IF (splflag2 & 0b00000100) = 0b00000100 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%引发敌对并显形~ END
+						PATCH_IF (splflag2 & 0b00001000) = 0b00001000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%无视野限制~ END
+						PATCH_IF (splflag2 & 0b00100000) = 0b00100000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%限室外施展~ END
+						PATCH_IF (splflag2 & 0b01000000) = 0b01000000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%无视狂乱波动和死魔法~ END
+						PATCH_IF (splflag2 & 0b10000000) = 0b10000000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%无视狂乱波动~ END
+						READ_BYTE 0x1B splflag4
+						PATCH_IF (splflag4 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%可瞄准隐形对象~ END
+						PATCH_IF (splflag4 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%沉默状态可施展~ END					
+						READ_LONG 0x34 spllevel
+						SPRINT newdesc ~%newdesc%~^~%WNL%法术等级：%spllevel%~
+						READ_SHORT 0x1C spltype
+						PATCH_IF spltype == 0 BEGIN SPRINT newdesc ~%newdesc%~^~，法术类型：特殊~ END
+						PATCH_IF spltype == 1 BEGIN SPRINT newdesc ~%newdesc%~^~，法术类型：法师~ END
+						PATCH_IF spltype == 2 BEGIN SPRINT newdesc ~%newdesc%~^~，法术类型：牧师~ END
+						PATCH_IF spltype == 3 BEGIN SPRINT newdesc ~%newdesc%~^~，法术类型：灵能~ END
+						PATCH_IF spltype == 4 BEGIN SPRINT newdesc ~%newdesc%~^~，法术类型：天生能力~ END
+						PATCH_IF spltype == 5 BEGIN SPRINT newdesc ~%newdesc%~^~，法术类型：战歌~ END
+						READ_BYTE 0x25 splschool
+						PATCH_IF splschool == 1 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：防护系~ END
+						PATCH_IF splschool == 2 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：咒法系~ END
+						PATCH_IF splschool == 3 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：预言系~ END
+						PATCH_IF splschool == 4 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：附魔系~ END
+						PATCH_IF splschool == 5 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：幻术系~ END
+						PATCH_IF splschool == 6 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：塑能系~ END
+						PATCH_IF splschool == 7 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：死灵系~ END
+						PATCH_IF splschool == 8 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：改变系~ END
+						PATCH_IF splschool == 9 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：全部~ END
+						PATCH_IF splschool == 10 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：野魔法~ END
+						READ_BYTE 0x1E splexclue1
+						PATCH_IF (splexclue1 & 0b01000000) = 0b01000000 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：防护系~ END
+						PATCH_IF (splexclue1 & 0b10000000) = 0b10000000 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：咒法系~ END
+						READ_BYTE 0x1F splexclue2
+						PATCH_IF (splexclue2 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：预言系~ END
+						PATCH_IF (splexclue2 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：附魔系~ END
+						PATCH_IF (splexclue2 & 0b00000100) = 0b00000100 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：幻术系~ END
+						PATCH_IF (splexclue2 & 0b00001000) = 0b00001000 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：塑能系~ END
+						PATCH_IF (splexclue2 & 0b00010000) = 0b00010000 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：死灵系~ END
+						PATCH_IF (splexclue2 & 0b00100000) = 0b00100000 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：改变系~ END
+						READ_BYTE 0x27 splsecond
+						PATCH_IF splsecond == 1 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：法术防护~ END
+						PATCH_IF splsecond == 2 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：特殊防护~ END
+						PATCH_IF splsecond == 3 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：幻术防护~ END
+						PATCH_IF splsecond == 4 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：破魔~ END
+						PATCH_IF splsecond == 5 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：破幻~ END
+						PATCH_IF splsecond == 6 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：咒法~ END
+						PATCH_IF splsecond == 7 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：战斗防护~ END
+						PATCH_IF splsecond == 8 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：意外~ END
+						PATCH_IF splsecond == 9 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：战场~ END
+						PATCH_IF splsecond == 10 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：攻击伤害~ END
+						PATCH_IF splsecond == 11 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：失能~ END
+						PATCH_IF splsecond == 12 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：综合~ END
+						PATCH_IF splsecond == 13 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：非战斗~ END	
+					//PATCH_PRINT ~spllevel=%spllevel%~
+						READ_LONG 0x6A spleffectoffset
+						READ_SHORT 0x70 spleffects
+					//PATCH_PRINT ~spleffectoffset=%spleffectoffset%~
+					//PATCH_PRINT ~spleffects=%spleffects%~
+					
+						SPRINT spldesc ~%newdesc%~	//备份
+						SPRINT tempdesc ~%newdesc%~^~%WNL%%WNL%施法时效果补充描述：~
+						SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%施法时效果补充描述：~
+						PATCH_IF spleffects > 0  BEGIN
+							FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = 0 effectnum = effectindex STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+							END
+						END
+						PATCH_IF NOT ~%newdesc%~ STRING_COMPARE ~%tempdesc%~ BEGIN	//STRING_COMPARE为0相等
+							SPRINT newdesc ~%spldesc%~	//还原备份
+						END
+
+						READ_LONG 0x64 splabilityoffset	//0x72
+						READ_SHORT 0x68 splabilities	//20
+					//PATCH_PRINT ~splabilityoffset=%splabilityoffset%~
+					//PATCH_PRINT ~splabilities=%splabilities%~
+						PATCH_IF splabilities == 1 BEGIN
+							SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%法术效果补充描述：~
+							
+							READ_SHORT (2 + splabilityoffset) spllocation
+							PATCH_IF (spllocation == 0)||(spllocation > 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：无~ END
+							PATCH_IF spllocation == 1 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：武器~ END
+							PATCH_IF spllocation == 2 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：法术~ END
+							PATCH_IF spllocation == 3 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：物品~ END
+							PATCH_IF spllocation == 4 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：天生能力~ END
+							READ_BYTE (12 + splabilityoffset) spltarget
+							PATCH_IF spltarget == 0 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：无~ END
+							PATCH_IF spltarget == 2 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：装备栏~ END
+							PATCH_IF spltarget == 3 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：活动对象（无视距离）~ END
+							PATCH_IF spltarget == 4 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：范围内任一点~ END
+							PATCH_IF spltarget == 5 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：施法者~ END
+							PATCH_IF spltarget == 7 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：施法者（瞬发）~ END
+							READ_BYTE (13 + splabilityoffset) spltargets
+							PATCH_IF spltargets > 1 BEGIN SPRINT newdesc ~%newdesc%~^~，目标数量：%spltargets%~ END
+							READ_SHORT (14 + splabilityoffset) splrange
+							SPRINT newdesc ~%newdesc%~^~，范围：%splrange%~
+							READ_SHORT (16 + splabilityoffset) splminlevel
+							SPRINT newdesc ~%newdesc%~^~，需求等级：%splminlevel%~
+							READ_SHORT (18 + splabilityoffset) splspeed
+							SPRINT newdesc ~%newdesc%~^~，施法时间：%splspeed%~
+							
+							READ_SHORT (30 + splabilityoffset) spleffects	//0x90
+							READ_SHORT (32 + splabilityoffset) spleff1st		//0x92
+							FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = spleff1st effectnum = effectindex STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+							END
+						END ELSE BEGIN
+						
+							SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%法术最低等级效果补充描述：~
+							
+							READ_SHORT (2 + splabilityoffset) spllocation
+							PATCH_IF (spllocation == 0)||(spllocation > 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：无~ END
+							PATCH_IF spllocation == 1 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：武器~ END
+							PATCH_IF spllocation == 2 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：法术~ END
+							PATCH_IF spllocation == 3 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：物品~ END
+							PATCH_IF spllocation == 4 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：天生能力~ END
+							READ_BYTE (12 + splabilityoffset) spltarget
+							PATCH_IF spltarget == 0 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：无~ END
+							PATCH_IF spltarget == 2 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：装备栏~ END
+							PATCH_IF spltarget == 3 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：活动对象（无视距离）~ END
+							PATCH_IF spltarget == 4 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：范围内任一点~ END
+							PATCH_IF spltarget == 5 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：施法者~ END
+							PATCH_IF spltarget == 7 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：施法者（瞬发）~ END
+							READ_BYTE (13 + splabilityoffset) spltargets
+							PATCH_IF spltargets > 1 BEGIN SPRINT newdesc ~%newdesc%~^~，目标数量：%spltargets%~ END
+							READ_SHORT (14 + splabilityoffset) splrange
+							SPRINT newdesc ~%newdesc%~^~，范围：%splrange%~
+							READ_SHORT (16 + splabilityoffset) splminlevel
+							SPRINT newdesc ~%newdesc%~^~，需求等级：%splminlevel%~
+							READ_SHORT (18 + splabilityoffset) splspeed
+							SPRINT newdesc ~%newdesc%~^~，施法时间：%splspeed%~
+
+							READ_SHORT (30 + splabilityoffset) spleffects	//0x90
+							READ_SHORT (32 + splabilityoffset) spleff1st		//0x92
+					//PATCH_PRINT ~minsplevel=%splminlevel%~
+					//PATCH_PRINT ~minspleffects=%spleffects%~
+					//PATCH_PRINT ~minspleff1st=%spleff1st%~
+							FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = spleff1st effectnum = effectindex STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+							END
+							
+							SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%法术最高等级效果补充描述：~
+
+							READ_SHORT (2 + splabilityoffset + 0x28 * (splabilities - 1)) spllocation
+							PATCH_IF (spllocation == 0)||(spllocation > 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：无~ END
+							PATCH_IF spllocation == 1 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：武器~ END
+							PATCH_IF spllocation == 2 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：法术~ END
+							PATCH_IF spllocation == 3 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：物品~ END
+							PATCH_IF spllocation == 4 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%位置：天生能力~ END
+							READ_BYTE (12 + splabilityoffset + 0x28 * (splabilities - 1)) spltarget
+							PATCH_IF spltarget == 0 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：无~ END
+							PATCH_IF spltarget == 2 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：装备栏~ END
+							PATCH_IF spltarget == 3 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：活动对象（无视距离）~ END
+							PATCH_IF spltarget == 4 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：范围内任一点~ END
+							PATCH_IF spltarget == 5 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：施法者~ END
+							PATCH_IF spltarget == 7 BEGIN SPRINT newdesc ~%newdesc%~^~，法术目标：施法者（瞬发）~ END
+							READ_BYTE (13 + splabilityoffset + 0x28 * (splabilities - 1)) spltargets
+							PATCH_IF spltargets > 1 BEGIN SPRINT newdesc ~%newdesc%~^~，目标数量：%spltargets%~ END
+							READ_SHORT (14 + splabilityoffset + 0x28 * (splabilities - 1)) splrange
+							SPRINT newdesc ~%newdesc%~^~，范围：%splrange%~
+							READ_SHORT (16 + splabilityoffset + 0x28 * (splabilities - 1)) splminlevel
+							SPRINT newdesc ~%newdesc%~^~，需求等级：%splminlevel%~
+							READ_SHORT (18 + splabilityoffset + 0x28 * (splabilities - 1)) splspeed
+							SPRINT newdesc ~%newdesc%~^~，施法时间：%splspeed%~
+
+							READ_SHORT (30 + splabilityoffset + 0x28 * (splabilities - 1)) spleffects	//splabilities，# effects
+							READ_SHORT (32 + splabilityoffset + 0x28 * (splabilities - 1)) spleff1st		//第一个eff是总eff的第几个（从第0个开始）
+					//PATCH_PRINT ~maxsplevel=%splminlevel%~
+					//PATCH_PRINT ~maxspleffects=%spleffects%~
+					//PATCH_PRINT ~maxspleff1st=%spleff1st%~
+							FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = spleff1st effectnum = effectindex STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+							END
+						END
+				//PATCH_PRINT ~%newdesc%~
+						SAY_EVALUATED 0x50 ~%newdesc%~
+					BUT_ONLY
+				
+				END
+			END
+		END
+	END
+BUT_ONLY
+	
+
+
