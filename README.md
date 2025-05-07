@@ -1,12 +1,11 @@
-Detailed Description v0.2
+v0.4
+除了图像文字等效果被省略外，几乎全部效果条目都可以进行识别
+对附加效果添加了详尽的说明
+可以对未注册法术进行补充说明，游戏中基本没机会见到，但对使用编辑器查看时用帮助
 
-Add detailed description to all items in game, correcting original description errors and display hidden item effects.
-Only has a Chinese version.
-
-
-Version History 
 v0.3
 可以对法术进行补充说明
+
 v0.2
 对原本无描述的物品会自动新建一份描述
 修正一些负值显示为6553x的情况
