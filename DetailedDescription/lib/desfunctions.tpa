@@ -4255,40 +4255,43 @@ BEGIN
 					SET descfixed = 0
 					INNER_ACTION BEGIN
 						COPY_EXISTING ~splprot.2da~ ~override~
-							READ_2DA_ENTRY readtype 0 4 splprotname
-							PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
-								READ_2DA_ENTRY readtype 1 4 splprotstat
-									PATCH_MATCH splprotstat
+							COUNT_2DA_ROWS 4 maxrows
+							PATCH_IF readtype < maxrows BEGIN
+								READ_2DA_ENTRY readtype 0 4 splprotname
+								PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
+									READ_2DA_ENTRY readtype 1 4 splprotstat
+										PATCH_MATCH splprotstat
+										WITH
+											0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT effectdesc ~%effectdesc%~^~（天气类型为%splproentry%~ END
+											0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT effectdesc ~%effectdesc%~^~（敌友类型为%splproentry%~ END
+											0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT effectdesc ~%effectdesc%~^~（一般类型为%splproentry%~ END
+											0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT effectdesc ~%effectdesc%~^~（种族类型为%splproentry%~ END
+											0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT effectdesc ~%effectdesc%~^~（职业类型为%splproentry%~ END
+											0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT effectdesc ~%effectdesc%~^~（特殊类型为%splproentry%~ END
+											0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT effectdesc ~%effectdesc%~^~（性别类型为%splproentry%~ END
+											0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT effectdesc ~%effectdesc%~^~（阵营类型为%splproentry%~ END
+											0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT effectdesc ~%effectdesc%~^~（状态为%splproentry%~ END
+											0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT effectdesc ~%effectdesc%~^~（状态为%splproentry%~ END
+											DEFAULT SPRINT effectdesc ~%effectdesc%~^~（%splprotname%，n=%readamount%~
+										END
+									SPRINT effectdesc ~%effectdesc%~^~）时防护特定法术／物品效果：~
+								END ELSE BEGIN
+									PATCH_MATCH readtype
 									WITH
-										0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT effectdesc ~%effectdesc%~^~（天气类型为%splproentry%~ END
-										0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT effectdesc ~%effectdesc%~^~（敌友类型为%splproentry%~ END
-										0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT effectdesc ~%effectdesc%~^~（一般类型为%splproentry%~ END
-										0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT effectdesc ~%effectdesc%~^~（种族类型为%splproentry%~ END
-										0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT effectdesc ~%effectdesc%~^~（职业类型为%splproentry%~ END
-										0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT effectdesc ~%effectdesc%~^~（特殊类型为%splproentry%~ END
-										0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT effectdesc ~%effectdesc%~^~（性别类型为%splproentry%~ END
-										0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT effectdesc ~%effectdesc%~^~（阵营类型为%splproentry%~ END
-										0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT effectdesc ~%effectdesc%~^~（状态为%splproentry%~ END
-										0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT effectdesc ~%effectdesc%~^~（状态为%splproentry%~ END
-										DEFAULT SPRINT effectdesc ~%effectdesc%~^~（%splprotname%，n=%readamount%~
+										21 BEGIN SPRINT effectdesc ~%effectdesc%~^~（21_ENTRIES=MAMMALS）时防护特定法术／物品效果：~ END
+										22 BEGIN SPRINT effectdesc ~%effectdesc%~^~（22_ENTRIES!=MAMMALS）时防护特定法术／物品效果：~ END
+										31 BEGIN SPRINT effectdesc ~%effectdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
+										32 BEGIN SPRINT effectdesc ~%effectdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
+										47 BEGIN SPRINT effectdesc ~%effectdesc%~^~（47_ENTRIES=UNBREATHING）时防护特定法术／物品效果：~ END
+										48 BEGIN SPRINT effectdesc ~%effectdesc%~^~（48_ENTRIES!=UNBREATHING）时防护特定法术／物品效果：~ END
+										53 BEGIN SPRINT effectdesc ~%effectdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时防护特定法术／物品效果：~ END
+										54 BEGIN SPRINT effectdesc ~%effectdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时防护特定法术／物品效果：~ END
+										55 BEGIN SPRINT effectdesc ~%effectdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END
+										56 BEGIN SPRINT effectdesc ~%effectdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END					
+										142 BEGIN SPRINT effectdesc ~%effectdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
+										143 BEGIN SPRINT effectdesc ~%effectdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
+										DEFAULT SPRINT effectdesc ~%effectdesc%~^~（%splprotname%）时防护特定法术／物品效果：~
 									END
-								SPRINT effectdesc ~%effectdesc%~^~）时防护特定法术／物品效果：~
-							END ELSE BEGIN
-								PATCH_MATCH readtype
-								WITH
-									21 BEGIN SPRINT effectdesc ~%effectdesc%~^~（21_ENTRIES=MAMMALS）时防护特定法术／物品效果：~ END
-									22 BEGIN SPRINT effectdesc ~%effectdesc%~^~（22_ENTRIES!=MAMMALS）时防护特定法术／物品效果：~ END
-									31 BEGIN SPRINT effectdesc ~%effectdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
-									32 BEGIN SPRINT effectdesc ~%effectdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
-									47 BEGIN SPRINT effectdesc ~%effectdesc%~^~（47_ENTRIES=UNBREATHING）时防护特定法术／物品效果：~ END
-									48 BEGIN SPRINT effectdesc ~%effectdesc%~^~（48_ENTRIES!=UNBREATHING）时防护特定法术／物品效果：~ END
-									53 BEGIN SPRINT effectdesc ~%effectdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时防护特定法术／物品效果：~ END
-									54 BEGIN SPRINT effectdesc ~%effectdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时防护特定法术／物品效果：~ END
-									55 BEGIN SPRINT effectdesc ~%effectdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END
-									56 BEGIN SPRINT effectdesc ~%effectdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END					
-									142 BEGIN SPRINT effectdesc ~%effectdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
-									143 BEGIN SPRINT effectdesc ~%effectdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
-									DEFAULT SPRINT effectdesc ~%effectdesc%~^~（%splprotname%）时防护特定法术／物品效果：~
 								END
 							END
 						BUT_ONLY
@@ -4468,40 +4471,43 @@ BEGIN
 					SPRINT effectdesc ~{满足特定情况~
 					INNER_ACTION BEGIN
 						COPY_EXISTING ~splprot.2da~ ~override~
-							READ_2DA_ENTRY readtype 0 4 splprotname
-							PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
-								READ_2DA_ENTRY readtype 1 4 splprotstat
-									PATCH_MATCH splprotstat
+							COUNT_2DA_ROWS 4 maxrows
+							PATCH_IF readtype < maxrows BEGIN
+								READ_2DA_ENTRY readtype 0 4 splprotname
+								PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
+									READ_2DA_ENTRY readtype 1 4 splprotstat
+										PATCH_MATCH splprotstat
+										WITH
+											0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT effectdesc ~%effectdesc%~^~（天气类型为%splproentry%~ END
+											0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT effectdesc ~%effectdesc%~^~（敌友类型为%splproentry%~ END
+											0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT effectdesc ~%effectdesc%~^~（一般类型为%splproentry%~ END
+											0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT effectdesc ~%effectdesc%~^~（种族类型为%splproentry%~ END
+											0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT effectdesc ~%effectdesc%~^~（职业类型为%splproentry%~ END
+											0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT effectdesc ~%effectdesc%~^~（特殊类型为%splproentry%~ END
+											0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT effectdesc ~%effectdesc%~^~（性别类型为%splproentry%~ END
+											0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT effectdesc ~%effectdesc%~^~（阵营类型为%splproentry%~ END
+											0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT effectdesc ~%effectdesc%~^~（状态为%splproentry%~ END
+											0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT effectdesc ~%effectdesc%~^~（状态为%splproentry%~ END
+											DEFAULT SPRINT effectdesc ~%effectdesc%~^~（%splprotname%，n=%readamount%~
+										END
+									SPRINT effectdesc ~%effectdesc%~^~）时应用特定效果~
+								END ELSE BEGIN	
+									PATCH_MATCH readtype
 									WITH
-										0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT effectdesc ~%effectdesc%~^~（天气类型为%splproentry%~ END
-										0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT effectdesc ~%effectdesc%~^~（敌友类型为%splproentry%~ END
-										0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT effectdesc ~%effectdesc%~^~（一般类型为%splproentry%~ END
-										0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT effectdesc ~%effectdesc%~^~（种族类型为%splproentry%~ END
-										0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT effectdesc ~%effectdesc%~^~（职业类型为%splproentry%~ END
-										0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT effectdesc ~%effectdesc%~^~（特殊类型为%splproentry%~ END
-										0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT effectdesc ~%effectdesc%~^~（性别类型为%splproentry%~ END
-										0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT effectdesc ~%effectdesc%~^~（阵营类型为%splproentry%~ END
-										0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT effectdesc ~%effectdesc%~^~（状态为%splproentry%~ END
-										0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT effectdesc ~%effectdesc%~^~（状态为%splproentry%~ END
-										DEFAULT SPRINT effectdesc ~%effectdesc%~^~（%splprotname%，n=%readamount%~
+										21 BEGIN SPRINT effectdesc ~%effectdesc%~^~（21_ENTRIES=MAMMALS）时应用特定效果~ END
+										22 BEGIN SPRINT effectdesc ~%effectdesc%~^~（22_ENTRIES!=MAMMALS）时应用特定效果~ END
+										31 BEGIN SPRINT effectdesc ~%effectdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时应用特定效果~ END
+										32 BEGIN SPRINT effectdesc ~%effectdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时应用特定效果~ END
+										47 BEGIN SPRINT effectdesc ~%effectdesc%~^~（47_ENTRIES=UNBREATHING）时应用特定效果~ END
+										48 BEGIN SPRINT effectdesc ~%effectdesc%~^~（48_ENTRIES!=UNBREATHING）时应用特定效果~ END
+										53 BEGIN SPRINT effectdesc ~%effectdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时应用特定效果~ END
+										54 BEGIN SPRINT effectdesc ~%effectdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时应用特定效果~ END
+										55 BEGIN SPRINT effectdesc ~%effectdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时应用特定效果~ END
+										56 BEGIN SPRINT effectdesc ~%effectdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时应用特定效果~ END					
+										142 BEGIN SPRINT effectdesc ~%effectdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
+										143 BEGIN SPRINT effectdesc ~%effectdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
+										DEFAULT SPRINT effectdesc ~%effectdesc%~^~（%splprotname%）时应用特定效果~
 									END
-								SPRINT effectdesc ~%effectdesc%~^~）时应用特定效果~
-							END ELSE BEGIN	
-								PATCH_MATCH readtype
-								WITH
-									21 BEGIN SPRINT effectdesc ~%effectdesc%~^~（21_ENTRIES=MAMMALS）时应用特定效果~ END
-									22 BEGIN SPRINT effectdesc ~%effectdesc%~^~（22_ENTRIES!=MAMMALS）时应用特定效果~ END
-									31 BEGIN SPRINT effectdesc ~%effectdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时应用特定效果~ END
-									32 BEGIN SPRINT effectdesc ~%effectdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时应用特定效果~ END
-									47 BEGIN SPRINT effectdesc ~%effectdesc%~^~（47_ENTRIES=UNBREATHING）时应用特定效果~ END
-									48 BEGIN SPRINT effectdesc ~%effectdesc%~^~（48_ENTRIES!=UNBREATHING）时应用特定效果~ END
-									53 BEGIN SPRINT effectdesc ~%effectdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时应用特定效果~ END
-									54 BEGIN SPRINT effectdesc ~%effectdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时应用特定效果~ END
-									55 BEGIN SPRINT effectdesc ~%effectdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时应用特定效果~ END
-									56 BEGIN SPRINT effectdesc ~%effectdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时应用特定效果~ END					
-									142 BEGIN SPRINT effectdesc ~%effectdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
-									143 BEGIN SPRINT effectdesc ~%effectdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
-									DEFAULT SPRINT effectdesc ~%effectdesc%~^~（%splprotname%）时应用特定效果~
 								END
 							END
 						BUT_ONLY
@@ -9013,40 +9019,43 @@ BEGIN
 		SET descfixed = 0
 		INNER_ACTION BEGIN
 			COPY_EXISTING ~splprot.2da~ ~override~
-				READ_2DA_ENTRY readtype 0 4 splprotname
-				PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
-					READ_2DA_ENTRY readtype 1 4 splprotstat
-						PATCH_MATCH splprotstat
+				COUNT_2DA_ROWS 4 maxrows
+				PATCH_IF readtype < maxrows BEGIN
+					READ_2DA_ENTRY readtype 0 4 splprotname
+					PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
+						READ_2DA_ENTRY readtype 1 4 splprotstat
+							PATCH_MATCH splprotstat
+							WITH
+								0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT newdesc ~%newdesc%~^~（天气类型为%splproentry%~ END
+								0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT newdesc ~%newdesc%~^~（敌友类型为%splproentry%~ END
+								0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT newdesc ~%newdesc%~^~（一般类型为%splproentry%~ END
+								0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT newdesc ~%newdesc%~^~（种族类型为%splproentry%~ END
+								0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT newdesc ~%newdesc%~^~（职业类型为%splproentry%~ END
+								0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT newdesc ~%newdesc%~^~（特殊类型为%splproentry%~ END
+								0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT newdesc ~%newdesc%~^~（性别类型为%splproentry%~ END
+								0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT newdesc ~%newdesc%~^~（阵营类型为%splproentry%~ END
+								0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
+								0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
+								DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%，n=%readamount%~
+							END
+						SPRINT newdesc ~%newdesc%~^~）时防护特定法术／物品效果：~
+					END ELSE BEGIN
+						PATCH_MATCH readtype
 						WITH
-							0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT newdesc ~%newdesc%~^~（天气类型为%splproentry%~ END
-							0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT newdesc ~%newdesc%~^~（敌友类型为%splproentry%~ END
-							0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT newdesc ~%newdesc%~^~（一般类型为%splproentry%~ END
-							0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT newdesc ~%newdesc%~^~（种族类型为%splproentry%~ END
-							0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT newdesc ~%newdesc%~^~（职业类型为%splproentry%~ END
-							0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT newdesc ~%newdesc%~^~（特殊类型为%splproentry%~ END
-							0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT newdesc ~%newdesc%~^~（性别类型为%splproentry%~ END
-							0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT newdesc ~%newdesc%~^~（阵营类型为%splproentry%~ END
-							0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
-							0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
-							DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%，n=%readamount%~
+							21 BEGIN SPRINT newdesc ~%newdesc%~^~（21_ENTRIES=MAMMALS）时防护特定法术／物品效果：~ END
+							22 BEGIN SPRINT newdesc ~%newdesc%~^~（22_ENTRIES!=MAMMALS）时防护特定法术／物品效果：~ END
+							31 BEGIN SPRINT newdesc ~%newdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
+							32 BEGIN SPRINT newdesc ~%newdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
+							47 BEGIN SPRINT newdesc ~%newdesc%~^~（47_ENTRIES=UNBREATHING）时防护特定法术／物品效果：~ END
+							48 BEGIN SPRINT newdesc ~%newdesc%~^~（48_ENTRIES!=UNBREATHING）时防护特定法术／物品效果：~ END
+							53 BEGIN SPRINT newdesc ~%newdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时防护特定法术／物品效果：~ END
+							54 BEGIN SPRINT newdesc ~%newdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时防护特定法术／物品效果：~ END
+							55 BEGIN SPRINT newdesc ~%newdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END
+							56 BEGIN SPRINT newdesc ~%newdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END					
+							142 BEGIN SPRINT newdesc ~%newdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
+							143 BEGIN SPRINT newdesc ~%newdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
+							DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%）时防护特定法术／物品效果：~
 						END
-					SPRINT newdesc ~%newdesc%~^~）时防护特定法术／物品效果：~
-				END ELSE BEGIN
-					PATCH_MATCH readtype
-					WITH
-						21 BEGIN SPRINT newdesc ~%newdesc%~^~（21_ENTRIES=MAMMALS）时防护特定法术／物品效果：~ END
-						22 BEGIN SPRINT newdesc ~%newdesc%~^~（22_ENTRIES!=MAMMALS）时防护特定法术／物品效果：~ END
-						31 BEGIN SPRINT newdesc ~%newdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
-						32 BEGIN SPRINT newdesc ~%newdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
-						47 BEGIN SPRINT newdesc ~%newdesc%~^~（47_ENTRIES=UNBREATHING）时防护特定法术／物品效果：~ END
-						48 BEGIN SPRINT newdesc ~%newdesc%~^~（48_ENTRIES!=UNBREATHING）时防护特定法术／物品效果：~ END
-						53 BEGIN SPRINT newdesc ~%newdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时防护特定法术／物品效果：~ END
-						54 BEGIN SPRINT newdesc ~%newdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时防护特定法术／物品效果：~ END
-						55 BEGIN SPRINT newdesc ~%newdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END
-						56 BEGIN SPRINT newdesc ~%newdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END					
-						142 BEGIN SPRINT newdesc ~%newdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
-						143 BEGIN SPRINT newdesc ~%newdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
-						DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%）时防护特定法术／物品效果：~
 					END
 				END
 			BUT_ONLY
@@ -9226,40 +9235,43 @@ BEGIN
 		SPRINT newdesc ~%newdesc%~^~%WNL%－满足特定情况~
 		INNER_ACTION BEGIN
 			COPY_EXISTING ~splprot.2da~ ~override~
-				READ_2DA_ENTRY readtype 0 4 splprotname
-				PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
-					READ_2DA_ENTRY readtype 1 4 splprotstat
-						PATCH_MATCH splprotstat
+				COUNT_2DA_ROWS 4 maxrows
+				PATCH_IF readtype < maxrows BEGIN
+					READ_2DA_ENTRY readtype 0 4 splprotname
+					PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
+						READ_2DA_ENTRY readtype 1 4 splprotstat
+							PATCH_MATCH splprotstat
+							WITH
+								0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT newdesc ~%newdesc%~^~（天气类型为%splproentry%~ END
+								0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT newdesc ~%newdesc%~^~（敌友类型为%splproentry%~ END
+								0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT newdesc ~%newdesc%~^~（一般类型为%splproentry%~ END
+								0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT newdesc ~%newdesc%~^~（种族类型为%splproentry%~ END
+								0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT newdesc ~%newdesc%~^~（职业类型为%splproentry%~ END
+								0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT newdesc ~%newdesc%~^~（特殊类型为%splproentry%~ END
+								0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT newdesc ~%newdesc%~^~（性别类型为%splproentry%~ END
+								0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT newdesc ~%newdesc%~^~（阵营类型为%splproentry%~ END
+								0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
+								0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
+								DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%，n=%readamount%~
+							END
+						SPRINT newdesc ~%newdesc%~^~）时应用特定效果~
+					END ELSE BEGIN	
+						PATCH_MATCH readtype
 						WITH
-							0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT newdesc ~%newdesc%~^~（天气类型为%splproentry%~ END
-							0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT newdesc ~%newdesc%~^~（敌友类型为%splproentry%~ END
-							0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT newdesc ~%newdesc%~^~（一般类型为%splproentry%~ END
-							0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT newdesc ~%newdesc%~^~（种族类型为%splproentry%~ END
-							0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT newdesc ~%newdesc%~^~（职业类型为%splproentry%~ END
-							0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT newdesc ~%newdesc%~^~（特殊类型为%splproentry%~ END
-							0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT newdesc ~%newdesc%~^~（性别类型为%splproentry%~ END
-							0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT newdesc ~%newdesc%~^~（阵营类型为%splproentry%~ END
-							0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
-							0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
-							DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%，n=%readamount%~
+							21 BEGIN SPRINT newdesc ~%newdesc%~^~（21_ENTRIES=MAMMALS）时应用特定效果~ END
+							22 BEGIN SPRINT newdesc ~%newdesc%~^~（22_ENTRIES!=MAMMALS）时应用特定效果~ END
+							31 BEGIN SPRINT newdesc ~%newdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时应用特定效果~ END
+							32 BEGIN SPRINT newdesc ~%newdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时应用特定效果~ END
+							47 BEGIN SPRINT newdesc ~%newdesc%~^~（47_ENTRIES=UNBREATHING）时应用特定效果~ END
+							48 BEGIN SPRINT newdesc ~%newdesc%~^~（48_ENTRIES!=UNBREATHING）时应用特定效果~ END
+							53 BEGIN SPRINT newdesc ~%newdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时应用特定效果~ END
+							54 BEGIN SPRINT newdesc ~%newdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时应用特定效果~ END
+							55 BEGIN SPRINT newdesc ~%newdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时应用特定效果~ END
+							56 BEGIN SPRINT newdesc ~%newdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时应用特定效果~ END					
+							142 BEGIN SPRINT newdesc ~%newdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
+							143 BEGIN SPRINT newdesc ~%newdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
+							DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%）时应用特定效果~
 						END
-					SPRINT newdesc ~%newdesc%~^~）时应用特定效果~
-				END ELSE BEGIN	
-					PATCH_MATCH readtype
-					WITH
-						21 BEGIN SPRINT newdesc ~%newdesc%~^~（21_ENTRIES=MAMMALS）时应用特定效果~ END
-						22 BEGIN SPRINT newdesc ~%newdesc%~^~（22_ENTRIES!=MAMMALS）时应用特定效果~ END
-						31 BEGIN SPRINT newdesc ~%newdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时应用特定效果~ END
-						32 BEGIN SPRINT newdesc ~%newdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时应用特定效果~ END
-						47 BEGIN SPRINT newdesc ~%newdesc%~^~（47_ENTRIES=UNBREATHING）时应用特定效果~ END
-						48 BEGIN SPRINT newdesc ~%newdesc%~^~（48_ENTRIES!=UNBREATHING）时应用特定效果~ END
-						53 BEGIN SPRINT newdesc ~%newdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时应用特定效果~ END
-						54 BEGIN SPRINT newdesc ~%newdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时应用特定效果~ END
-						55 BEGIN SPRINT newdesc ~%newdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时应用特定效果~ END
-						56 BEGIN SPRINT newdesc ~%newdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时应用特定效果~ END					
-						142 BEGIN SPRINT newdesc ~%newdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
-						143 BEGIN SPRINT newdesc ~%newdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
-						DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%）时应用特定效果~
 					END
 				END
 			BUT_ONLY
@@ -11048,40 +11060,43 @@ BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－满足特定情况~
 			INNER_ACTION BEGIN
 				COPY_EXISTING ~splprot.2da~ ~override~
-					READ_2DA_ENTRY readtype 0 4 splprotname
-					PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
-						READ_2DA_ENTRY readtype 1 4 splprotstat
-							PATCH_MATCH splprotstat
+					COUNT_2DA_ROWS 4 maxrows
+					PATCH_IF readtype < maxrows BEGIN
+						READ_2DA_ENTRY readtype 0 4 splprotname
+						PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
+							READ_2DA_ENTRY readtype 1 4 splprotstat
+								PATCH_MATCH splprotstat
+								WITH
+									0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT newdesc ~%newdesc%~^~（天气类型为%splproentry%~ END
+									0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT newdesc ~%newdesc%~^~（敌友类型为%splproentry%~ END
+									0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT newdesc ~%newdesc%~^~（一般类型为%splproentry%~ END
+									0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT newdesc ~%newdesc%~^~（种族类型为%splproentry%~ END
+									0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT newdesc ~%newdesc%~^~（职业类型为%splproentry%~ END
+									0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT newdesc ~%newdesc%~^~（特殊类型为%splproentry%~ END
+									0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT newdesc ~%newdesc%~^~（性别类型为%splproentry%~ END
+									0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT newdesc ~%newdesc%~^~（阵营类型为%splproentry%~ END
+									0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
+									0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
+									DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%，n=%readamount%~
+								END
+							SPRINT newdesc ~%newdesc%~^~）时防护特定法术／物品效果：~
+						END ELSE BEGIN	
+							PATCH_MATCH readtype
 							WITH
-								0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT newdesc ~%newdesc%~^~（天气类型为%splproentry%~ END
-								0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT newdesc ~%newdesc%~^~（敌友类型为%splproentry%~ END
-								0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT newdesc ~%newdesc%~^~（一般类型为%splproentry%~ END
-								0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT newdesc ~%newdesc%~^~（种族类型为%splproentry%~ END
-								0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT newdesc ~%newdesc%~^~（职业类型为%splproentry%~ END
-								0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT newdesc ~%newdesc%~^~（特殊类型为%splproentry%~ END
-								0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT newdesc ~%newdesc%~^~（性别类型为%splproentry%~ END
-								0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT newdesc ~%newdesc%~^~（阵营类型为%splproentry%~ END
-								0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
-								0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
-								DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%，n=%readamount%~
+								21 BEGIN SPRINT newdesc ~%newdesc%~^~（21_ENTRIES=MAMMALS）时防护特定法术／物品效果：~ END
+								22 BEGIN SPRINT newdesc ~%newdesc%~^~（22_ENTRIES!=MAMMALS）时防护特定法术／物品效果：~ END
+								31 BEGIN SPRINT newdesc ~%newdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
+								32 BEGIN SPRINT newdesc ~%newdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
+								47 BEGIN SPRINT newdesc ~%newdesc%~^~（47_ENTRIES=UNBREATHING）时防护特定法术／物品效果：~ END
+								48 BEGIN SPRINT newdesc ~%newdesc%~^~（48_ENTRIES!=UNBREATHING）时防护特定法术／物品效果：~ END
+								53 BEGIN SPRINT newdesc ~%newdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时防护特定法术／物品效果：~ END
+								54 BEGIN SPRINT newdesc ~%newdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时防护特定法术／物品效果：~ END
+								55 BEGIN SPRINT newdesc ~%newdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END
+								56 BEGIN SPRINT newdesc ~%newdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END					
+								142 BEGIN SPRINT newdesc ~%newdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
+								143 BEGIN SPRINT newdesc ~%newdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
+								DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%）时防护特定法术／物品效果：~
 							END
-						SPRINT newdesc ~%newdesc%~^~）时防护特定法术／物品效果：~
-					END ELSE BEGIN	
-						PATCH_MATCH readtype
-						WITH
-							21 BEGIN SPRINT newdesc ~%newdesc%~^~（21_ENTRIES=MAMMALS）时防护特定法术／物品效果：~ END
-							22 BEGIN SPRINT newdesc ~%newdesc%~^~（22_ENTRIES!=MAMMALS）时防护特定法术／物品效果：~ END
-							31 BEGIN SPRINT newdesc ~%newdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
-							32 BEGIN SPRINT newdesc ~%newdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时防护特定法术／物品效果：~ END
-							47 BEGIN SPRINT newdesc ~%newdesc%~^~（47_ENTRIES=UNBREATHING）时防护特定法术／物品效果：~ END
-							48 BEGIN SPRINT newdesc ~%newdesc%~^~（48_ENTRIES!=UNBREATHING）时防护特定法术／物品效果：~ END
-							53 BEGIN SPRINT newdesc ~%newdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时防护特定法术／物品效果：~ END
-							54 BEGIN SPRINT newdesc ~%newdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时防护特定法术／物品效果：~ END
-							55 BEGIN SPRINT newdesc ~%newdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END
-							56 BEGIN SPRINT newdesc ~%newdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时防护特定法术／物品效果：~ END					
-							142 BEGIN SPRINT newdesc ~%newdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
-							143 BEGIN SPRINT newdesc ~%newdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时防护特定法术／物品效果：~ END
-							DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%）时防护特定法术／物品效果：~
 						END
 					END
 				BUT_ONLY
@@ -11253,40 +11268,43 @@ BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－满足特定情况~
 			INNER_ACTION BEGIN
 				COPY_EXISTING ~splprot.2da~ ~override~
-					READ_2DA_ENTRY readtype 0 4 splprotname
-					PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
-						READ_2DA_ENTRY readtype 1 4 splprotstat
-							PATCH_MATCH splprotstat
+					COUNT_2DA_ROWS 4 maxrows
+					PATCH_IF readtype < maxrows BEGIN
+						READ_2DA_ENTRY readtype 0 4 splprotname
+						PATCH_IF ( ~%splprotname%~ STRING_CONTAINS_REGEXP ~[<>=]n$~ ) == 0 BEGIN
+							READ_2DA_ENTRY readtype 1 4 splprotstat
+								PATCH_MATCH splprotstat
+								WITH
+									0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT newdesc ~%newdesc%~^~（天气类型为%splproentry%~ END
+									0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT newdesc ~%newdesc%~^~（敌友类型为%splproentry%~ END
+									0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT newdesc ~%newdesc%~^~（一般类型为%splproentry%~ END
+									0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT newdesc ~%newdesc%~^~（种族类型为%splproentry%~ END
+									0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT newdesc ~%newdesc%~^~（职业类型为%splproentry%~ END
+									0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT newdesc ~%newdesc%~^~（特殊类型为%splproentry%~ END
+									0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT newdesc ~%newdesc%~^~（性别类型为%splproentry%~ END
+									0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT newdesc ~%newdesc%~^~（阵营类型为%splproentry%~ END
+									0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
+									0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
+									DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%，n=%readamount%~
+								END
+							SPRINT newdesc ~%newdesc%~^~）时应用特定效果~
+						END ELSE BEGIN	
+							PATCH_MATCH readtype
 							WITH
-								0x106 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~AREATYPE~ readamount SPRINT newdesc ~%newdesc%~^~（天气类型为%splproentry%~ END
-								0x10a BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~EA~ readamount SPRINT newdesc ~%newdesc%~^~（敌友类型为%splproentry%~ END
-								0x10b BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENERAL~ readamount SPRINT newdesc ~%newdesc%~^~（一般类型为%splproentry%~ END
-								0x10c BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~RACE~ readamount SPRINT newdesc ~%newdesc%~^~（种族类型为%splproentry%~ END
-								0x10d BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~CLASS~ readamount SPRINT newdesc ~%newdesc%~^~（职业类型为%splproentry%~ END
-								0x10e BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPECIFIC~ readamount SPRINT newdesc ~%newdesc%~^~（特殊类型为%splproentry%~ END
-								0x10f BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~GENDER~ readamount SPRINT newdesc ~%newdesc%~^~（性别类型为%splproentry%~ END
-								0x110 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~ALIGNMENT~ readamount SPRINT newdesc ~%newdesc%~^~（阵营类型为%splproentry%~ END
-								0x111 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~STATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
-								0x112 BEGIN LOOKUP_IDS_SYMBOL_OF_INT splproentry ~SPLSTATE~ readamount SPRINT newdesc ~%newdesc%~^~（状态为%splproentry%~ END
-								DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%，n=%readamount%~
+								21 BEGIN SPRINT newdesc ~%newdesc%~^~（21_ENTRIES=MAMMALS）时应用特定效果~ END
+								22 BEGIN SPRINT newdesc ~%newdesc%~^~（22_ENTRIES!=MAMMALS）时应用特定效果~ END
+								31 BEGIN SPRINT newdesc ~%newdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时应用特定效果~ END
+								32 BEGIN SPRINT newdesc ~%newdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时应用特定效果~ END
+								47 BEGIN SPRINT newdesc ~%newdesc%~^~（47_ENTRIES=UNBREATHING）时应用特定效果~ END
+								48 BEGIN SPRINT newdesc ~%newdesc%~^~（48_ENTRIES!=UNBREATHING）时应用特定效果~ END
+								53 BEGIN SPRINT newdesc ~%newdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时应用特定效果~ END
+								54 BEGIN SPRINT newdesc ~%newdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时应用特定效果~ END
+								55 BEGIN SPRINT newdesc ~%newdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时应用特定效果~ END
+								56 BEGIN SPRINT newdesc ~%newdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时应用特定效果~ END					
+								142 BEGIN SPRINT newdesc ~%newdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
+								143 BEGIN SPRINT newdesc ~%newdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
+								DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%）时应用特定效果~
 							END
-						SPRINT newdesc ~%newdesc%~^~）时应用特定效果~
-					END ELSE BEGIN	
-						PATCH_MATCH readtype
-						WITH
-							21 BEGIN SPRINT newdesc ~%newdesc%~^~（21_ENTRIES=MAMMALS）时应用特定效果~ END
-							22 BEGIN SPRINT newdesc ~%newdesc%~^~（22_ENTRIES!=MAMMALS）时应用特定效果~ END
-							31 BEGIN SPRINT newdesc ~%newdesc%~^~（31_ENTRIES=UNDEAD&MYCONID）时应用特定效果~ END
-							32 BEGIN SPRINT newdesc ~%newdesc%~^~（32_ENTRIES!=UNDEAD&MYCONID）时应用特定效果~ END
-							47 BEGIN SPRINT newdesc ~%newdesc%~^~（47_ENTRIES=UNBREATHING）时应用特定效果~ END
-							48 BEGIN SPRINT newdesc ~%newdesc%~^~（48_ENTRIES!=UNBREATHING）时应用特定效果~ END
-							53 BEGIN SPRINT newdesc ~%newdesc%~^~（53_STAT(RESISTFIRE)&(RESISTCOLD)>=100）时应用特定效果~ END
-							54 BEGIN SPRINT newdesc ~%newdesc%~^~（54_STAT(RESISTFIRE)&(RESISTCOLD)<100）时应用特定效果~ END
-							55 BEGIN SPRINT newdesc ~%newdesc%~^~（55_ENTRIES=UNDEAD&GOLEM）时应用特定效果~ END
-							56 BEGIN SPRINT newdesc ~%newdesc%~^~（56_ENTRIES!=UNDEAD&GOLEM）时应用特定效果~ END					
-							142 BEGIN SPRINT newdesc ~%newdesc%~^~（142_STATEBITS=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
-							143 BEGIN SPRINT newdesc ~%newdesc%~^~（143_STATEBITS!=STATE_INVISIBLE&STATE_IMPROVEDINVISIBILITY）时应用特定效果~ END
-							DEFAULT SPRINT newdesc ~%newdesc%~^~（%splprotname%）时应用特定效果~
 						END
 					END
 				BUT_ONLY
