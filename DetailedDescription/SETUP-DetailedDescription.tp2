@@ -1,12 +1,199 @@
 BACKUP ~DetailedDescription/backup~
 AUTHOR ~shohy@126.com~
-VERSION ~v0.4~
+VERSION ~v0.6~
 
 ALWAYS
-	INCLUDE ~DetailedDescription/lib/desfunctions.tpa~
+
+INCLUDE ~DetailedDescription/lib/desfunctions.tpa~
+
+COPY ~lang/zh_CN/dialog.tlk~ ~override~		
+	READ_LONG 0x0a totaltextamount
+BUT_ONLY
+
 END
 
-BEGIN ~物品增加详细说明（安装前请确保游戏中没有物品或法术名称乱码的情况。否则安装此MOD会增加崩溃机会）~
+BEGIN ~检查整个游戏的中文文本是否存在乱码（时间较长，可跳过不运行，仅在后继安装中检查所用到的文本）注：有乱码时安装本MOD可能导致某些场景游戏崩溃~
+DESIGNATED 0
+
+OUTER_SET garbledtextexist = 0
+
+COPY ~lang/zh_CN/dialog.tlk~ ~override~		
+	//READ_LONG 0x0a totaltextamount
+	
+	SET textprogress = totaltextamount / 20
+	
+	PATCH_PRINT ~dialog.tlk共含%totaltextamount%条文本~
+
+	FOR (tlkindex = 1 ; tlkindex < totaltextamount ; ++tlkindex) BEGIN
+	
+		PATCH_IF (tlkindex MODULO textprogress == 0) BEGIN
+			PATCH_PRINT ~完成进度%tlkindex%/%totaltextamount%~
+		END
+
+		SET descoffsetaddress = 0x24 + (%tlkindex% * 0x1a)	//计算出此条文本在tlk中记录开始位置的地址
+		SET desclengthaddress = 0x28 + (%tlkindex% * 0x1a)	//计算出此条文本在tlk中记录文本长度的地址
+		//PATCH_PRINT ~descoffsetaddress=%descoffsetaddress%~
+		//PATCH_PRINT ~desclengthaddress=%desclengthaddress%~
+
+		READ_LONG 0x0e textoffset	//tlk中总文本开始地址
+
+		READ_LONG descoffsetaddress descoffset		//读取tlk索引，找到此条文本开始位置（需要加上总文本开始地址）
+		//PATCH_PRINT ~descoffset=%descoffset%~
+		READ_LONG desclengthaddress desclength		//读取tlk索引，找到此条文本长度（单位为单字节即FF）
+		//PATCH_PRINT ~desclength=%desclength%~
+		
+		SET notgarbled = 1
+		
+		//检查是不是UTF8编码
+		FOR (index = 0 ; index < desclength ; ++index) BEGIN
+		
+			SET textcodecheck = 0
+			
+			//PATCH_PRINT ~index=%index%~
+			SET descaddress = descoffset + textoffset + index
+			//LPF TO_HEX_NUMBER INT_VAR value = descaddress prefix = 1 RET hexNumber END
+			//PATCH_PRINT ~descaddress=%hexNumber%~
+			READ_BYTE descaddress textcode
+			//LPF TO_HEX_NUMBER INT_VAR value = textcode prefix = 1 RET hexNumber END
+			//PATCH_PRINT ~textcode=%hexNumber%~
+					
+			//SET $textcodecheck(~%index%~) = 0
+			
+			PATCH_IF textcode <= 0x7F BEGIN
+				//PATCH_PRINT ~以UTF8编码规则检查，貌似是英文文本~
+				SET textcodecheck = 1
+				//SET $textcodecheck(~%index%~) = 1
+			END
+			
+			SET codetest1 = textcode & 0b11100000
+			//PATCH_PRINT ~codetest1=%codetest1%~
+			SET codetest2 = textcode & 0b11110000
+			//PATCH_PRINT ~codetest2=%codetest2%~
+			SET codetest3 = textcode & 0b11111000
+			//PATCH_PRINT ~codetest3=%codetest3%~
+			
+			PATCH_IF (codetest1 == 192) BEGIN	//高位三个bit是110，读下一个字节
+				//PATCH_PRINT ~发现疑似二字节汉字开头~
+				SET index = index +1
+				SET descaddress = descoffset + textoffset + index
+				//LPF TO_HEX_NUMBER INT_VAR value = descaddress prefix = 1 RET hexNumber END
+				READ_BYTE descaddress textcode1
+				//PATCH_PRINT ~发现疑似双字节汉字开头，读取下一字节textcode=%hexNumber%~
+				SET codetest = textcode1 & 0b11000000
+				PATCH_IF codetest == 128 BEGIN
+					//PATCH_PRINT ~以UTF8编码规则检查，貌似是双字节汉字~
+					SET textcodecheck = 1
+					//SET indexo = index -1
+					//SET $textcodecheck(~%indexo%~) = 1
+				END
+			END
+			
+			PATCH_IF (codetest2 == 224) BEGIN	//高位四个bit是1110，读下一个字节
+				//PATCH_PRINT ~发现疑似三字节汉字开头~
+				SET index = index +1
+				SET descaddress = descoffset + textoffset + index
+				//LPF TO_HEX_NUMBER INT_VAR value = descaddress prefix = 1 RET hexNumber END
+				READ_BYTE descaddress textcode1
+				//PATCH_PRINT ~发现疑似三字节汉字开头，读取下一字节textcode=%hexNumber%~
+				SET codetest = textcode1 & 0b11000000
+				PATCH_IF codetest == 128 BEGIN
+					SET index = index +1
+					SET descaddress = descoffset + textoffset + index
+					//LPF TO_HEX_NUMBER INT_VAR value = descaddress prefix = 1 RET hexNumber END
+					READ_BYTE descaddress textcode2
+					//PATCH_PRINT ~读取下二字节textcode=%hexNumber%~
+					SET codetest = textcode2 & 0b11000000
+					PATCH_IF codetest == 128 BEGIN
+						//PATCH_PRINT ~以UTF8编码规则检查，貌似是三字节汉字~
+						SET textcodecheck = 1
+						//SET indexo = index -2
+						//SET $textcodecheck(~%indexo%~) = 1
+					END
+				END
+			END
+			
+			PATCH_IF (codetest3 == 240) BEGIN	//高位四个bit是1110，读下一个字节
+				//PATCH_PRINT ~发现疑似四字节汉字开头~
+				SET index = index +1
+				SET descaddress = descoffset + textoffset + index
+				//LPF TO_HEX_NUMBER INT_VAR value = descaddress prefix = 1 RET hexNumber END
+				READ_BYTE descaddress textcode1
+				//PATCH_PRINT ~发现疑似四字节汉字开头，读取下一字节textcode=%hexNumber%~
+				SET codetest = textcode1 & 0b11000000
+				PATCH_IF codetest == 128 BEGIN
+					SET index = index +1
+					SET descaddress = descoffset + textoffset + index
+					//LPF TO_HEX_NUMBER INT_VAR value = descaddress prefix = 1 RET hexNumber END
+					READ_BYTE descaddress textcode2
+					//PATCH_PRINT ~读取下二字节textcode=%hexNumber%~
+					SET codetest = textcode2 & 0b11000000
+					PATCH_IF codetest == 128 BEGIN			
+						SET index = index +1
+						SET descaddress = descoffset + textoffset + index
+						//LPF TO_HEX_NUMBER INT_VAR value = descaddress prefix = 1 RET hexNumber END
+						READ_BYTE descaddress textcode3
+						//PATCH_PRINT ~读取下三字节textcode=%hexNumber%~
+						SET codetest = textcode3 & 0b11000000
+						PATCH_IF codetest == 128 BEGIN
+							//PATCH_PRINT ~以UTF8编码规则检查，貌似是四字节汉字~
+							SET textcodecheck = 1
+							//SET indexo = index -3
+							//SET $textcodecheck(~%indexo%~) = 1
+						END
+					END
+				END
+			END
+			
+			SET notgarbled = textcodecheck && notgarbled
+			PATCH_IF notgarbled == 0 BEGIN
+				PATCH_PRINT ~编号%tlkindex%文本疑似乱码！！~
+				SET garbledtextexist = 1
+				SET index = desclength + 1
+			END
+			
+		END	//检查当前条目中所有文字是不是UTF8编码
+		
+		PATCH_IF notgarbled == 1 BEGIN		//前面检查没问题，再检查是不是锟斤拷
+			FOR (index = 0 ; index < desclength ; ++index) BEGIN
+				SET descaddress = descoffset + textoffset + index
+				READ_BYTE descaddress textcode
+				PATCH_IF textcode == 239 BEGIN
+					SET index = index +1
+					SET descaddress = descoffset + textoffset + index
+					READ_BYTE descaddress textcode1
+					PATCH_IF textcode1 == 191 BEGIN
+						SET index = index +1
+						SET descaddress = descoffset + textoffset + index
+						READ_BYTE descaddress textcode2
+						PATCH_IF textcode2 == 189 BEGIN
+							//PATCH_PRINT ~锟斤拷~
+							SET notgarbled = 0
+							SET index = desclength + 1
+						END
+					END
+				END
+			END
+
+			PATCH_IF notgarbled == 0 BEGIN
+				PATCH_PRINT ~编号%tlkindex%文本疑似乱码！~
+				SET garbledtextexist = 1
+			END
+
+		END	//检查是不是锟斤拷
+		
+	END	//遍历tlk所有条目
+	
+	PATCH_IF garbledtextexist == 0 BEGIN
+		PATCH_PRINT ~dialog.tlk已经检查完毕，未发现乱码情况，可以继续安装。~
+	END ELSE BEGIN
+		PATCH_PRINT ~dialog.tlk已经检查完毕，发现乱码情况，建议修正后再继续安装。接下来的安装中将不再对原本物品/法术描述做乱码检查~
+	END
+	
+BUT_ONLY
+
+
+
+BEGIN ~物品增加详细说明~
 
 COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 //COPY_EXISTING ~bdamul02.ITM~ ~override~
@@ -15,42 +202,42 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 		READ_LONG 0x54 iddescref
 		READ_STRREF 0x54 iddesc
 		//PATCH_PRINT ~iddescref=%iddesc%~
-		PATCH_IF NOT (iddescref >= 0 && iddescref < 2147483646) BEGIN	//已鉴定描述不在范围内，换未鉴定描述
+		PATCH_IF NOT (iddescref >= 0 && iddescref < totaltextamount) BEGIN	//已鉴定描述不在数字范围内，换未鉴定描述
 			READ_LONG 0x50 iddescref
 			READ_STRREF 0x50 iddesc
 			//PATCH_PRINT ~niddescref=%iddesc%~
-			PATCH_IF NOT (iddescref >= 0 && iddescref < 2147483646) BEGIN	//未鉴定描述还是没有，新建一个	
+			PATCH_IF NOT (iddescref >= 0 && iddescref < totaltextamount) BEGIN	//未鉴定描述也不在数字范围内，新建一个
 				SPRINT iddesc ~物品原本无描述~
 				//PATCH_PRINT ~nniddescref=%iddesc%~
 			END
 		END
-		
-		PATCH_IF NOT (~%iddesc%~ STRING_CONTAINS_REGEXP ~��~) BEGIN	//STRING_CONTAINS_REGEXP结果是1表示不包含
-		
-			PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文描述乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
-			输入1删除原描述继续安装（但不保证解决问题），输入2取消安装。~
-			PATCH_READLN howtodo
-			WHILE NOT(IS_AN_INT %howtodo%) || (%howtodo% > 2) || (%howtodo% < 1) BEGIN
-				PATCH_PRINT ~请输入1或2。输入1删除原描述继续安装（但不保证解决问题），输入2取消安装。~
-				PATCH_READLN howtodo
-			END
-			PATCH_IF (howtodo == 1) THEN BEGIN SPRINT iddesc ~物品描述原本乱码~ END ELSE BEGIN PATCH_FAIL ~物品“%SOURCE_RES%.itm”描述乱码，请检查，安装取消~ END
-		END
-		
-		PATCH_IF ~%iddesc%~ STRING_CONTAINS_REGEXP ~Invalid Strref~ BEGIN	//STRING_CONTAINS_REGEXP结果是1表示不包含
+		PATCH_IF ~%iddesc%~ STRING_CONTAINS_REGEXP ~Invalid Strref~ BEGIN	//描述文本不为空。STRING_CONTAINS_REGEXP结果是1表示不包含
 			//去除所有中文文本空格
-			PATCH_IF (~%iddesc%~ STRING_CONTAINS_REGEXP ~资料~)&&(~%iddesc%~ STRING_CONTAINS_REGEXP ~能力~)&&(~%iddesc%~ STRING_CONTAINS_REGEXP ~重量~)&&(~%iddesc%~ STRING_CONTAINS_REGEXP ~需求~)&&(~%iddesc%~ STRING_CONTAINS_REGEXP ~：~) BEGIN
+			PATCH_IF NOT (~%iddesc%~ STRING_CONTAINS_REGEXP ~[是的数据资料能力重量需求，。：]~) BEGIN
 				INNER_PATCH_SAVE newdesc ~%iddesc%~ BEGIN	//修改文本
 					REPLACE_TEXTUALLY ~ +~ ~~
-					//REPLACE_TEXTUALLY ~^ +- +\(.+\)$~ ~－\1~
-					//REPLACE_TEXTUALLY ~^ +\(.+\)$~ ~\1~
+					//REPLACE_TEXTUALLY ~\([^a-zA_Z]+\) +\([^a-zA_Z]+\)~ ~\1\2~
 				END
 			END ELSE BEGIN
 				SPRINT newdesc ~%iddesc%~	//不是中文文本，不去除
 			END
-		END ELSE BEGIN
+		END ELSE BEGIN	//数字指向的描述文本为空，显示Invalid Strref
 			SPRINT newdesc ~物品原本无描述~
 			//PATCH_PRINT ~nnniddescref=%newdesc%~
+		END
+		PATCH_IF (~%iddesc%~ STRING_COMPARE ~物品原本无描述~) && (NOT MOD_IS_INSTALLED "SETUP-DetailedDescription.tp2" "0") BEGIN	//有正常描述存在且未做全面检查
+			LPF CHECK_GARBLED_TEXT INT_VAR descindex = iddescref RET notgarbled END
+			//PATCH_PRINT ~notgarbled=%notgarbled%~
+			PATCH_IF (notgarbled == 0) BEGIN
+				PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文描述乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
+				输入1弃用原描述并继续安装（但不保证解决问题），输入2取消安装。~
+				PATCH_READLN howtodo
+				WHILE NOT(IS_AN_INT %howtodo%) || (%howtodo% > 2) || (%howtodo% < 1) BEGIN
+					PATCH_PRINT ~请输入1或2。输入1弃用原描述并继续安装（但不保证解决问题），输入2取消安装。~
+					PATCH_READLN howtodo
+				END
+				PATCH_IF (howtodo == 1) THEN BEGIN SPRINT iddesc ~物品描述原本乱码~ END ELSE BEGIN PATCH_FAIL ~物品“%SOURCE_RES%.itm”描述乱码，请检查，安装取消~ END
+			END
 		END
 		
 		SET controlnum = (~%newdesc%~ STRING_COMPARE ~%iddesc%~)	//相等为0，不相等削过空格为1
@@ -423,7 +610,6 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 			END	//装备存在能力
 		END	//是近战或投掷武器
 		
-		
 		//是任意物品
 		PATCH_IF (itemtype != 5)&&(itemtype != 8)&&(itemtype != 14)&&(itemtype != 31)&&(itemtype != 33)&&(itemtype != 34)&&(itemtype != 36)&&(itemtype != 37)&&(itemtype != 38) BEGIN
 			//SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%战斗能力资料补充：~	//准备修改物品能力描述
@@ -509,7 +695,7 @@ COPY_EXISTING ~SPELL.ids~ ~override~
 						PATCH_IF (SOURCE_SIZE > 0x72) BEGIN
 
 							READ_LONG 0x50 spldescref
-							PATCH_IF NOT (spldescref >= 0 && spldescref < 2147483646) BEGIN
+							PATCH_IF NOT (spldescref >= 0 && spldescref < totaltextamount) BEGIN
 								SPRINT spldesc ~法术原本无描述~
 							END ELSE BEGIN 
 								READ_STRREF 0x50 spldesc
@@ -517,21 +703,8 @@ COPY_EXISTING ~SPELL.ids~ ~override~
 									SPRINT spldesc ~法术原本无描述~
 								END
 							END
-		
-							PATCH_IF NOT (~%spldesc%~ STRING_CONTAINS_REGEXP ~��~) BEGIN	//STRING_CONTAINS_REGEXP结果是1表示不包含
-							
-								PATCH_PRINT ~法术“%splfilename%.spl”存在中文描述乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
-								输入1删除原描述继续安装（但不保证解决问题），输入2取消安装。~
-								PATCH_READLN howtodo
-								WHILE NOT(IS_AN_INT %howtodo%) || (%howtodo% > 2) || (%howtodo% < 1) BEGIN
-									PATCH_PRINT ~请输入1或2。输入1删除原描述继续安装（但不保证解决问题），输入2取消安装。~
-									PATCH_READLN howtodo
-								END
-								PATCH_IF (howtodo == 1) THEN BEGIN SPRINT spldesc ~法术描述原本乱码~ END ELSE BEGIN PATCH_FAIL ~法术“%splfilename%.spl”描述乱码，请检查，安装取消~ END
-							END
-
 							//去除所有中文文本空格
-							PATCH_IF (~%spldesc%~ STRING_CONTAINS_REGEXP ~等级~)&&(~%spldesc%~ STRING_CONTAINS_REGEXP ~时间~)&&(~%spldesc%~ STRING_CONTAINS_REGEXP ~范围~)&&(~%spldesc%~ STRING_CONTAINS_REGEXP ~豁免~)&&(~%spldesc%~ STRING_CONTAINS_REGEXP ~：~) BEGIN
+							PATCH_IF NOT (~%spldesc%~ STRING_CONTAINS_REGEXP ~[是的等级距离时间范围豁免，。：]~) BEGIN
 								INNER_PATCH_SAVE newdesc ~%spldesc%~ BEGIN	//修改文本
 									REPLACE_TEXTUALLY ~ +~ ~~
 									//REPLACE_TEXTUALLY ~^ +- +\(.+\)$~ ~－\1~
@@ -540,7 +713,19 @@ COPY_EXISTING ~SPELL.ids~ ~override~
 							END ELSE BEGIN
 								SPRINT newdesc ~%spldesc%~
 							END
-					
+							PATCH_IF (~%spldesc%~ STRING_COMPARE ~法术原本无描述~) && (NOT MOD_IS_INSTALLED "SETUP-DetailedDescription.tp2" "0") BEGIN	//有正常描述存在且未做全面检查
+								LPF CHECK_GARBLED_TEXT INT_VAR descindex = spldescref RET notgarbled END
+								PATCH_IF (notgarbled == 0) BEGIN							
+									PATCH_PRINT ~法术“%splfilename%.spl”存在中文描述乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
+									输入1弃用原描述并继续安装（但不保证解决问题），输入2取消安装。~
+									PATCH_READLN howtodo
+									WHILE NOT(IS_AN_INT %howtodo%) || (%howtodo% > 2) || (%howtodo% < 1) BEGIN
+										PATCH_PRINT ~请输入1或2。输入1弃用原描述并继续安装（但不保证解决问题），输入2取消安装。~
+										PATCH_READLN howtodo
+									END
+									PATCH_IF (howtodo == 1) THEN BEGIN SPRINT spldesc ~法术描述原本乱码~ END ELSE BEGIN PATCH_FAIL ~法术“%splfilename%.spl”描述乱码，请检查，安装取消~ END
+								END
+							END					
 						//PATCH_PRINT ~%spldesc%~
 							SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%法术基础特性补充描述：~
 							READ_BYTE 0x19 splflag2
@@ -745,7 +930,7 @@ BUT_ONLY
 
 
 
-BEGIN ~未注册法术增加详细说明（游戏中基本见不到，仅用于辅助编辑器查看）~
+BEGIN ~未注册法术增加详细说明（游戏中可能大多见不到，主要对使用编辑器查看法术有帮助作用）~
 
 COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 //COPY_EXISTING ~SPCL941.SPL~ ~override~
@@ -754,7 +939,7 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 	PATCH_IF (SOURCE_SIZE > 0x72) BEGIN
 	
 		READ_LONG 0x50 spldescref
-		PATCH_IF NOT (spldescref >= 0 && spldescref < 2147483646) BEGIN
+		PATCH_IF NOT (spldescref >= 0 && spldescref < totaltextamount) BEGIN
 			SPRINT spldesc ~法术原本无描述~
 		END ELSE BEGIN 
 			READ_STRREF 0x50 spldesc
@@ -762,7 +947,31 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 				SPRINT spldesc ~法术原本无描述~
 			END
 		END
-		PATCH_IF ~%spldesc%~ STRING_CONTAINS_REGEXP ~法术基础特性补充描述：~ BEGIN
+		//去除所有中文文本空格
+		PATCH_IF NOT (~%spldesc%~ STRING_CONTAINS_REGEXP ~[是的等级距离时间范围豁免，。：]~) BEGIN
+			INNER_PATCH_SAVE newdesc ~%spldesc%~ BEGIN	//修改文本
+				REPLACE_TEXTUALLY ~ +~ ~~
+				//REPLACE_TEXTUALLY ~^ +- +\(.+\)$~ ~－\1~
+				//REPLACE_TEXTUALLY ~^ +\(.+\)$~ ~\1~
+			END
+		END ELSE BEGIN
+			SPRINT newdesc ~%spldesc%~
+		END
+		PATCH_IF (~%spldesc%~ STRING_COMPARE ~法术原本无描述~) && (NOT MOD_IS_INSTALLED "SETUP-DetailedDescription.tp2" "0") BEGIN	//有正常描述存在且未做全面检查
+			LPF CHECK_GARBLED_TEXT INT_VAR descindex = spldescref RET notgarbled END
+			PATCH_IF (notgarbled == 0) BEGIN							
+				PATCH_PRINT ~法术“%splfilename%.spl”存在中文描述乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
+				输入1弃用原描述并继续安装（但不保证解决问题），输入2取消安装。~
+				PATCH_READLN howtodo
+				WHILE NOT(IS_AN_INT %howtodo%) || (%howtodo% > 2) || (%howtodo% < 1) BEGIN
+					PATCH_PRINT ~请输入1或2。输入1弃用原描述并继续安装（但不保证解决问题），输入2取消安装。~
+					PATCH_READLN howtodo
+				END
+				PATCH_IF (howtodo == 1) THEN BEGIN SPRINT spldesc ~法术描述原本乱码~ END ELSE BEGIN PATCH_FAIL ~法术“%splfilename%.spl”描述乱码，请检查，安装取消~ END
+			END
+		END
+		
+		PATCH_IF ~%newdesc%~ STRING_CONTAINS_REGEXP ~法术基础特性补充描述：~ BEGIN
 			
 		//PATCH_PRINT ~%spldesc%~
 			SPRINT newdesc ~%spldesc%~^~%WNL%%WNL%法术基础特性补充描述：~
