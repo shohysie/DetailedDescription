@@ -3621,34 +3621,28 @@ BEGIN
 					READ_LONG 0x1c readamount
 					READ_LONG 0x20 readtype
 					SET descfixed = 0
-					PATCH_MATCH readamount
-						WITH
-						89 BEGIN SPRINT weapontype ~巨剑~ SET descfixed = 1 END
-						90 BEGIN SPRINT weapontype ~长剑~ SET descfixed = 1 END
-						91 BEGIN SPRINT weapontype ~短剑~ SET descfixed = 1 END
-						92 BEGIN SPRINT weapontype ~斧~ SET descfixed = 1 END
-						93 BEGIN SPRINT weapontype ~双手剑~ SET descfixed = 1 END
-						94 BEGIN SPRINT weapontype ~武士刀~ SET descfixed = 1 END
-						95 BEGIN SPRINT weapontype ~弯刀／肋差／忍者刀~ SET descfixed = 1 END
-						96 BEGIN SPRINT weapontype ~匕首~ SET descfixed = 1 END
-						97 BEGIN SPRINT weapontype ~战锤~ SET descfixed = 1 END
-						98 BEGIN SPRINT weapontype ~矛~ SET descfixed = 1 END
-						99 BEGIN SPRINT weapontype ~戟~ SET descfixed = 1 END
-						100 BEGIN SPRINT weapontype ~链枷／星芒锤~ SET descfixed = 1 END
-						101 BEGIN SPRINT weapontype ~钉头锤~ SET descfixed = 1 END
-						102 BEGIN SPRINT weapontype ~手杖~ SET descfixed = 1 END
-						103 BEGIN SPRINT weapontype ~十字弓~ SET descfixed = 1 END
-						104 BEGIN SPRINT weapontype ~长弓~ SET descfixed = 1 END
-						105 BEGIN SPRINT weapontype ~短弓~ SET descfixed = 1 END
-						106 BEGIN SPRINT weapontype ~飞镖~ SET descfixed = 1 END
-						107 BEGIN SPRINT weapontype ~投石索~ SET descfixed = 1 END
-						111 BEGIN SPRINT weapontype ~双手武器~ SET descfixed = 1 END
-						112 BEGIN SPRINT weapontype ~剑盾~ SET descfixed = 1 END
-						113 BEGIN SPRINT weapontype ~单手武器~ SET descfixed = 1 END
-						114 BEGIN SPRINT weapontype ~双武器~ SET descfixed = 1 END
-						DEFAULT SET descfixed = 0
+					PATCH_IF !VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
+						INNER_ACTION BEGIN
+							COPY_EXISTING ~WEAPPROF.2DA~ ~override~
+								COUNT_2DA_ROWS 12 rows
+								FOR ( index = 1 ; index < rows ; index = index + 1 ) BEGIN
+									READ_2DA_ENTRY index 1 12 wprof_id
+									PATCH_IF wprof_id < 116 BEGIN
+										READ_2DA_ENTRY index 2 12 wprof_name
+										GET_STRREF wprof_name wprof_string
+										PATCH_IF (~%wprof_string%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)&&(STRING_LENGTH ~%wprof_string%~ != 0) BEGIN	
+											SPRINT $wprof_namestring(~%wprof_id%~) ~%wprof_string%~
+										END
+									END
+								END
+							BUT_ONLY
+						END
 					END
-					PATCH_IF (descfixed == 1) && (readamount >= 0) && (readamount < 6) BEGIN SPRINT effectdesc ~{设置%weapontype%熟练度为%readamount%~ END ELSE BEGIN SET descfixed = 0 END
+					PATCH_IF VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
+						SPRINT temp_string $wprof_namestring(~%readtype%~)
+						SET descfixed = 1
+					END
+					PATCH_IF (descfixed == 1) && (readamount >= 0) && (readamount < 6) BEGIN SPRINT effectdesc ~{设置%temp_string%熟练度为%readamount%~ END ELSE BEGIN SET descfixed = 0 END
 					PATCH_IF (descfixed == 1) BEGIN
 						READ_LONG 0x38 readdiceamonut
 						PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -8012,34 +8006,28 @@ BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (firsteff + effectnum - 1)) readamount
 		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
 		SET descfixed = 0
-		PATCH_MATCH readamount
-			WITH
-			89 BEGIN SPRINT weapontype ~巨剑~ SET descfixed = 1 END
-			90 BEGIN SPRINT weapontype ~长剑~ SET descfixed = 1 END
-			91 BEGIN SPRINT weapontype ~短剑~ SET descfixed = 1 END
-			92 BEGIN SPRINT weapontype ~斧~ SET descfixed = 1 END
-			93 BEGIN SPRINT weapontype ~双手剑~ SET descfixed = 1 END
-			94 BEGIN SPRINT weapontype ~武士刀~ SET descfixed = 1 END
-			95 BEGIN SPRINT weapontype ~弯刀／肋差／忍者刀~ SET descfixed = 1 END
-			96 BEGIN SPRINT weapontype ~匕首~ SET descfixed = 1 END
-			97 BEGIN SPRINT weapontype ~战锤~ SET descfixed = 1 END
-			98 BEGIN SPRINT weapontype ~矛~ SET descfixed = 1 END
-			99 BEGIN SPRINT weapontype ~戟~ SET descfixed = 1 END
-			100 BEGIN SPRINT weapontype ~链枷／星芒锤~ SET descfixed = 1 END
-			101 BEGIN SPRINT weapontype ~钉头锤~ SET descfixed = 1 END
-			102 BEGIN SPRINT weapontype ~手杖~ SET descfixed = 1 END
-			103 BEGIN SPRINT weapontype ~十字弓~ SET descfixed = 1 END
-			104 BEGIN SPRINT weapontype ~长弓~ SET descfixed = 1 END
-			105 BEGIN SPRINT weapontype ~短弓~ SET descfixed = 1 END
-			106 BEGIN SPRINT weapontype ~飞镖~ SET descfixed = 1 END
-			107 BEGIN SPRINT weapontype ~投石索~ SET descfixed = 1 END
-			111 BEGIN SPRINT weapontype ~双手武器~ SET descfixed = 1 END
-			112 BEGIN SPRINT weapontype ~剑盾~ SET descfixed = 1 END
-			113 BEGIN SPRINT weapontype ~单手武器~ SET descfixed = 1 END
-			114 BEGIN SPRINT weapontype ~双武器~ SET descfixed = 1 END
-			DEFAULT SET descfixed = 0
+		PATCH_IF !VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
+			INNER_ACTION BEGIN
+				COPY_EXISTING ~WEAPPROF.2DA~ ~override~
+					COUNT_2DA_ROWS 12 rows
+					FOR ( index = 1 ; index < rows ; index = index + 1 ) BEGIN
+						READ_2DA_ENTRY index 1 12 wprof_id
+						PATCH_IF wprof_id < 116 BEGIN
+							READ_2DA_ENTRY index 2 12 wprof_name
+							GET_STRREF wprof_name wprof_string
+							PATCH_IF (~%wprof_string%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)&&(STRING_LENGTH ~%wprof_string%~ != 0) BEGIN	
+								SPRINT $wprof_namestring(~%wprof_id%~) ~%wprof_string%~
+							END
+						END
+					END
+				BUT_ONLY
+			END
 		END
-		PATCH_IF (descfixed == 1) && (readamount >= 0) && (readamount < 6) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置%weapontype%熟练度为%readamount%~ END ELSE BEGIN SET descfixed = 0 END
+		PATCH_IF VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
+			SPRINT temp_string $wprof_namestring(~%readtype%~)
+			SET descfixed = 1
+		END
+		PATCH_IF (descfixed == 1) && (readamount >= 0) && (readamount < 6) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置%temp_string%熟练度为%readamount%~ END ELSE BEGIN SET descfixed = 0 END
 		PATCH_IF (descfixed == 1) BEGIN
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -10361,30 +10349,29 @@ BEGIN
 	PATCH_IF opcode == 233 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (effectnum - 1)) readamount
 		READ_LONG (8 + effoffset + 0x30 * (effectnum - 1)) readtype
-		PATCH_IF (readtype == 89) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－巨剑熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 90) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－长剑熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 91) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－短剑熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 92) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－战斧熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 93) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－双手剑熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 94) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－武士刀熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 95) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－弯刀／腰刀／忍者刀熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 96) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－匕首熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 97) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－战锤熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 98) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－长矛熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 99) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－战戟熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 100) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－链枷／流星锤熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 101) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－钉头锤熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 102) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－手杖熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 103) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－十字弓熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 104) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－长弓熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 105) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－短弓熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 106) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－飞镖锤熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 107) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－投石索熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 111) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－双手武器流派熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 112) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－剑盾流派熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 113) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－单手武器流派熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 114) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－双武器流派熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 115) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－棍棒熟练度设为：%readamount%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+		PATCH_IF !VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
+			INNER_ACTION BEGIN
+				COPY_EXISTING ~WEAPPROF.2DA~ ~override~
+					COUNT_2DA_ROWS 12 rows
+					FOR ( index = 1 ; index < rows ; index = index + 1 ) BEGIN
+						READ_2DA_ENTRY index 1 12 wprof_id
+						PATCH_IF wprof_id < 116 BEGIN
+							READ_2DA_ENTRY index 2 12 wprof_name
+							GET_STRREF wprof_name wprof_string
+							PATCH_IF (~%wprof_string%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)&&(STRING_LENGTH ~%wprof_string%~ != 0) BEGIN	
+								SPRINT $wprof_namestring(~%wprof_id%~) ~%wprof_string%~
+							END
+						END
+					END
+				BUT_ONLY
+			END
+		END
+		PATCH_IF VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
+			SPRINT temp_string $wprof_namestring(~%readtype%~)
+			SPRINT newdesc ~%newdesc%~^~%WNL%－%temp_string%熟练度设为：%readamount%~
+			LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END
+			SET addnum = pnum + 1
+		END
 	END
 
 	PATCH_IF opcode == 245 BEGIN

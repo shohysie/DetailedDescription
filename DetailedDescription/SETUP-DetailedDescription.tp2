@@ -446,28 +446,32 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 				END ELSE BEGIN
 					SPRINT newdesc ~%newdesc%~^~%WNL%单手使用~
 				END			
-				READ_BYTE 0x31 abilityprof
-				PATCH_IF (abilityprof == 89) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：巨剑~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 90) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：长剑~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 91) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：短剑~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 92) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：战斧~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 93) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：双手剑~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 94) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：武士刀~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 95) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：弯刀／腰刀／忍者刀~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 96) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：匕首~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 97) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：战锤~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 98) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：长矛~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 99) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：战戟~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 100) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：链枷／流星锤~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 101) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：钉头锤~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 102) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：手杖~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 103) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：十字弓~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 104) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：长弓~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 105) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：短弓~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 106) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：飞镖锤~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 107) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：投石索~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof == 115) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：棍棒~ SET addnum = addnum + 1 END
-				PATCH_IF (abilityprof < 89)||((abilityprof > 107)&&(abilityprof != 115)) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：无~ SET addnum = addnum + 1 END
+				READ_BYTE 0x31 abilityprof				
+				PATCH_IF !VARIABLE_IS_SET $wprof_namestring("%abilityprof%") BEGIN
+					INNER_ACTION BEGIN
+						COPY_EXISTING ~WEAPPROF.2DA~ ~override~
+							COUNT_2DA_ROWS 12 rows
+							FOR ( index = 1 ; index < rows ; index = index + 1 ) BEGIN
+								READ_2DA_ENTRY index 1 12 wprof_id
+								PATCH_IF wprof_id < 116 BEGIN
+									READ_2DA_ENTRY index 2 12 wprof_name
+									GET_STRREF wprof_name wprof_string
+									PATCH_IF (~%wprof_string%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)&&(STRING_LENGTH ~%wprof_string%~ != 0) BEGIN	
+										SPRINT $wprof_namestring(~%wprof_id%~) ~%wprof_string%~
+									END
+								END
+							END
+						BUT_ONLY
+					END
+				END
+				PATCH_IF VARIABLE_IS_SET $wprof_namestring("%abilityprof%") BEGIN
+					SPRINT temp_string $wprof_namestring(~%abilityprof%~)
+					SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：%temp_string%~
+					SET addnum = addnum + 1
+				END ELSE BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：未知~
+					SET addnum = addnum + 1
+				END
 				READ_LONG 0x64 abilityoffset
 				READ_SHORT 0x68 abilityamount
 				PATCH_IF abilityamount > 0 BEGIN
