@@ -13,7 +13,7 @@ LANGUAGE  ~Simplified Chinese~	~schinese~ 		~DetailedDescription/tra/dd#garbl.tr
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 BEGIN ~检查整个游戏的中文乱码条目并进行修复（若未安装此组件，后继组件遇到乱码文本仅能将文本弃用）
 
-（如果发现乱码文本并进行了修复，请按q退出此窗口以便于文本更新，然后重新运行安装程序，再跳过此组件进行后继安装）~
+（如果运行时发现乱码文本并进行了修复，之后【务必】按q退出此窗口以便于文本更新。然后重新运行安装程序，再跳过此组件进行后继安装）~
 DESIGNATED 0
 REQUIRE_PREDICATE GAME_IS ~bgee bg2ee eet~ ~仅支持EE版~
 
@@ -281,8 +281,20 @@ ACTION_IF (FILE_SIZE ~DetailedDescription/2da/dd#garbl.2da~ > 0)&&(MOD_IS_INSTAL
     BUT_ONLY
 END
 */
+
+//ACTION_IF NOT VARIABLE_IS_SET clearnoname BEGIN
+//	PRINT ~请输入1或2。
+//输入1遇到相关的无名字物品/生物/法术不进行描述；输入2以“未知”进行描述如[防护法术：未知法术（SPWI999）]。~
+//	ACTION_READLN clearnoname
+//	OUTER_WHILE NOT(IS_AN_INT %clearnoname%) || (%clearnoname% > 2) || (%clearnoname% < 1) BEGIN
+//		PRINT ~请输入1或2。
+//输入1遇到相关的无名字物品/生物/法术不进行描述；输入2以“未知”进行描述如[防护法术：未知法术（SPWI999）]。~
+//		ACTION_READLN clearnoname
+//	END
+//END
 COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 //COPY_EXISTING ~ACIDBL.ITM~ ~override~
+
 	PATCH_IF (SOURCE_SIZE > 0x72) BEGIN
 	
 		READ_SHORT 0x1c itemtype
@@ -469,7 +481,7 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 					SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：%temp_string%~
 					SET addnum = addnum + 1
 				END ELSE BEGIN
-					SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：未知~
+					SPRINT newdesc ~%newdesc%~^~%WNL%武器熟练类型：非正常类型~
 					SET addnum = addnum + 1
 				END
 				READ_LONG 0x64 abilityoffset
@@ -771,6 +783,16 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 				END	//装备存在能力
 			END	//不是无能力物品
 			
+//			//WHILE循环似乎无能为力，改成指定次数的FOR循环
+//			PATCH_IF clearnoname == 1 BEGIN
+//				FOR (index = 0 ; index < 6 ; ++index)
+//					PATCH_IF (NOT ~%newdesc%~ STRING_CONTAINS_REGEXP ~%WNL%.+\(未知\|不存在的\)\(物品\|生物\|法术\).*$~) BEGIN
+//						INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN	//修改文本
+//							REPLACE_TEXTUALLY ~%WNL%.+\(未知\|不存在的\)\(物品\|生物\|法术\).*$~ ~~
+//						END
+//					END
+//				END
+//			END
 			PATCH_IF addnum > 0 BEGIN SAY_EVALUATED 0x54 ~%newdesc%~ END
 
 		END
@@ -786,7 +808,16 @@ END
 BEGIN ~已注册法术增加详细说明（随等级成长的法术只显示最低级和最高级的效果）~
 
 //ACTION_CLEAR_ARRAY spell_done
-
+//ACTION_IF NOT VARIABLE_IS_SET clearnoname BEGIN
+//	PRINT ~请输入1或2。
+//输入1遇到相关的无名字物品/生物/法术不进行描述；输入2以“未知”进行描述如[防护法术：未知法术（SPWI999）]。~
+//	ACTION_READLN clearnoname
+//	OUTER_WHILE NOT(IS_AN_INT %clearnoname%) || (%clearnoname% > 2) || (%clearnoname% < 1) BEGIN
+//		PRINT ~请输入1或2。
+//输入1遇到相关的无名字物品/生物/法术不进行描述；输入2以“未知”进行描述如[防护法术：未知法术（SPWI999）]。~
+//		ACTION_READLN clearnoname
+//	END
+//END
 COPY_EXISTING ~SPELL.ids~ ~override~
 	COUNT_2DA_ROWS 2 rows
 	FOR (index = 1 ; index < rows ; ++index) BEGIN
@@ -1060,6 +1091,18 @@ COPY_EXISTING ~SPELL.ids~ ~override~
 									END
 								END	//法术效果加具体描述
 								//PATCH_PRINT ~%newdesc%~
+								
+//								PATCH_IF clearnoname == 1 BEGIN
+//									FOR (index = 0 ; index < 6 ; ++index)
+//										PATCH_IF (NOT ~%newdesc%~ STRING_CONTAINS_REGEXP ~%WNL%.+\(未知\|不存在的\)\(物品\|生物\|法术\).*$~) BEGIN
+//											INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN	//修改文本
+//												REPLACE_TEXTUALLY ~%WNL%.+\(未知\|不存在的\)\(物品\|生物\|法术\).*$~ ~~
+//											END
+//										END
+//									END
+//								END
+								PATCH_IF addnum > 0 BEGIN SAY_EVALUATED 0x54 ~%newdesc%~ END
+								
 								SAY_EVALUATED 0x50 ~%newdesc%~
 								
 							END	//之前没处理过
@@ -1081,6 +1124,16 @@ END
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 BEGIN ~未注册法术增加详细说明（主要是给MOD技能增加说明，以及在使用编辑器查看法术时更方便）~
 
+//ACTION_IF NOT VARIABLE_IS_SET clearnoname BEGIN
+//	PRINT ~请输入1或2。
+//输入1遇到相关的无名字物品/生物/法术不进行描述；输入2以“未知”进行描述如[防护法术：未知法术（SPWI999）]。~
+//	ACTION_READLN clearnoname
+//	OUTER_WHILE NOT(IS_AN_INT %clearnoname%) || (%clearnoname% > 2) || (%clearnoname% < 1) BEGIN
+//		PRINT ~请输入1或2。
+//输入1遇到相关的无名字物品/生物/法术不进行描述；输入2以“未知”进行描述如[防护法术：未知法术（SPWI999）]。~
+//		ACTION_READLN clearnoname
+//	END
+//END
 COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 //COPY_EXISTING ~SPCL941.SPL~ ~override~
 	SPRINT newdesc ~~
@@ -1334,6 +1387,18 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 				END
 			END
 			//PATCH_PRINT ~%newdesc%~
+
+//			PATCH_IF clearnoname == 1 BEGIN
+//				FOR (index = 0 ; index < 6 ; ++index)
+//					PATCH_IF (NOT ~%newdesc%~ STRING_CONTAINS_REGEXP ~%WNL%.+\(未知\|不存在的\)\(物品\|生物\|法术\).*$~) BEGIN
+//						INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN	//修改文本
+//							REPLACE_TEXTUALLY ~%WNL%.+\(未知\|不存在的\)\(物品\|生物\|法术\).*$~ ~~
+//						END
+//					END
+//				END
+//			END
+			PATCH_IF addnum > 0 BEGIN SAY_EVALUATED 0x54 ~%newdesc%~ END			
+			
 			SAY_EVALUATED 0x50 ~%newdesc%~
 		END
 	END

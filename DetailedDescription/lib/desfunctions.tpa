@@ -325,8 +325,9 @@ BEGIN
 				SET descdone = 1
 			END
 		END ELSE BEGIN	//代码存在但物品不存在
-			SPRINT namestr ~~
+			SPRINT namestr ~不存在的物品~
 		END
+		SPRINT namestr ~%namestr%~^~（%itmcode%）~
 	END
 	//作为生物输入
 	PATCH_IF (STRING_LENGTH ~%crecode%~ > 0) BEGIN
@@ -417,8 +418,9 @@ BEGIN
 				SET descdone = 1
 			END
 		END ELSE BEGIN	//代码存在但生物不存在
-			SPRINT namestr ~~
+			SPRINT namestr ~不存在的生物~
 		END
+		SPRINT namestr ~%namestr%~^~（%crecode%）~
 	END
 	//作为法术输入
 	PATCH_IF (STRING_LENGTH ~%splcode%~ > 0) BEGIN
@@ -471,8 +473,9 @@ BEGIN
 				SET descdone = 1
 			END
 		END ELSE BEGIN	//代码存在但法术不存在
-			SPRINT namestr ~~
+			SPRINT namestr ~不存在的法术~
 		END
+		SPRINT namestr ~%namestr%~^~（%splcode%）~
 	END
 	
 	//所有代码为空
@@ -545,6 +548,7 @@ BEGIN
 	END
 	READ_BYTE 0x2c readprob1
 	READ_BYTE 0x2e readprob2
+	PATCH_IF readprob1 == 100 BEGIN SET readprob1 = 99 END
 	SET realprob = readprob1 - readprob2 + 1
 	PATCH_IF (realprob < 100) BEGIN SPRINT effectdesc ~%effectdesc%~^~，生效概率%realprob%％~ END
 	
@@ -1367,7 +1371,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					READ_LONG 0x38 readdiceamonut
@@ -1518,7 +1522,7 @@ BEGIN
 						0 1 3 BEGIN SPRINT effectdesc ~%effectdesc%~^~（与目标敌友类型一致，无目标则敌对）~ END
 						2 4 6 8 255 BEGIN SPRINT effectdesc ~%effectdesc%~^~（敌友类型由生物本身决定）~ END
 						5 BEGIN SPRINT effectdesc ~%effectdesc%~^~（与目标敌对）~ END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（未知的敌友类型）~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的敌友类型代码）~
 					END
 					LPF APPEND_ATTACH_DESC INT_VAR vopcode = viaopcode STR_VAR adesc = EVAL ~%effectdesc%~ RET effectdesc END
 				END
@@ -1563,7 +1567,7 @@ BEGIN
 						4 BEGIN SPRINT effectdesc ~%effectdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
 						5 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						6 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					READ_LONG 0x38 readdiceamonut
@@ -1974,7 +1978,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					READ_LONG 0x38 readdiceamonut
@@ -2000,7 +2004,7 @@ BEGIN
 								END
 							END
 							PATCH_IF index < maxrows BEGIN
-								SPRINT effectdesc ~%effectdesc%~^~未知效果~
+								SPRINT effectdesc ~%effectdesc%~^~其它效果（#%readtype%）~
 							END
 						BUT_ONLY
 					END
@@ -2087,7 +2091,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					READ_LONG 0x38 readdiceamonut
@@ -2450,7 +2454,7 @@ BEGIN
 						14 BEGIN SPRINT effectdesc ~%effectdesc%~^~显形~ END
 						15 BEGIN SPRINT effectdesc ~%effectdesc%~^~隐藏~ END
 						16 BEGIN SPRINT effectdesc ~%effectdesc%~^~昏睡~ END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~未知~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~错误动作代码~
 					END
 					READ_LONG 0x38 readdiceamonut
 					PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -2764,7 +2768,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					READ_LONG 0x38 readdiceamonut
@@ -2806,7 +2810,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					READ_LONG 0x38 readdiceamonut
@@ -2832,7 +2836,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					PATCH_IF readpara3 > 0 BEGIN SPRINT effectdesc ~%effectdesc%~^~命中修正：%readpara3%~ END
@@ -2862,7 +2866,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					PATCH_IF readpara3 > 0 BEGIN SPRINT effectdesc ~%effectdesc%~^~伤害修正：%readpara3%~ END
@@ -2930,7 +2934,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					READ_LONG 0x38 readdiceamonut
@@ -3023,7 +3027,7 @@ BEGIN
 								END
 							END
 							PATCH_IF index < maxrows BEGIN
-								SPRINT effectdesc ~%effectdesc%~^~未知效果~
+								SPRINT effectdesc ~%effectdesc%~^~其它效果（#%readtype%）~
 							END
 						BUT_ONLY
 					END
@@ -3316,7 +3320,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					SPRINT effectdesc ~%effectdesc%~^~防御修正：%readspecial%~
@@ -3718,7 +3722,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					READ_LONG 0x38 readdiceamonut
@@ -4169,7 +4173,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
 					READ_LONG 0x38 readdiceamonut
@@ -4721,7 +4725,7 @@ BEGIN
 								END
 							END
 							PATCH_IF index != (maxrows + 1) BEGIN
-								SPRINT effectdesc ~%effectdesc%~^~未知效果~
+								SPRINT effectdesc ~%effectdesc%~^~其它效果（#%readtype%）~
 							END
 						BUT_ONLY
 					END
@@ -4801,7 +4805,7 @@ BEGIN
 						7 BEGIN SPRINT effectdesc ~%effectdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 						8 BEGIN SPRINT effectdesc ~%effectdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 						9 BEGIN SPRINT effectdesc ~%effectdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					PATCH_MATCH readpara3
 					WITH
@@ -5024,7 +5028,8 @@ BEGIN
 		PATCH_IF (readdisres == 3) BEGIN SPRINT newdesc ~%newdesc%~^~，无视魔抗但可驱散~ END
 	END
 	READ_BYTE (18 + effoffset + 0x30 * (afirsteff + aeffectnum - 1)) readprob1
-	READ_BYTE (19 + effoffset + 0x30 * (afirsteff + aeffectnum - 1)) readprob2
+	READ_BYTE (19 + effoffset + 0x30 * (afirsteff + aeffectnum - 1)) readprob2	
+	PATCH_IF readprob1 == 100 BEGIN SET readprob1 = 99 END
 	SET realprob = readprob1 - readprob2 + 1
 	PATCH_IF (realprob < 100) BEGIN SPRINT newdesc ~%newdesc%~^~，生效概率%realprob%％~ END
 	READ_BYTE (36 + effoffset + 0x30 * (afirsteff + aeffectnum - 1)) readsavetype
@@ -5823,7 +5828,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
@@ -5974,7 +5979,7 @@ BEGIN
 			0 1 3 BEGIN SPRINT newdesc ~%newdesc%~^~（与目标敌友类型一致，无目标则敌对）~ END
 			2 4 6 8 255 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型由生物本身决定）~ END
 			5 BEGIN SPRINT newdesc ~%newdesc%~^~（与目标敌对）~ END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（未知的敌友类型）~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的敌友类型代码）~
 		END
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 	END
@@ -6019,7 +6024,7 @@ BEGIN
 			4 BEGIN SPRINT newdesc ~%newdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
 			5 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			6 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
@@ -6416,7 +6421,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
@@ -6441,7 +6446,7 @@ BEGIN
 					END
 				END
 				PATCH_IF index < maxrows BEGIN
-					SPRINT newdesc ~%newdesc%~^~未知效果~
+					SPRINT newdesc ~%newdesc%~^~其它效果（#%readtype%）~
 				END
 			BUT_ONLY
 		END
@@ -6528,7 +6533,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
@@ -6842,7 +6847,7 @@ BEGIN
 			14 BEGIN SPRINT newdesc ~%newdesc%~^~显形~ END
 			15 BEGIN SPRINT newdesc ~%newdesc%~^~隐藏~ END
 			16 BEGIN SPRINT newdesc ~%newdesc%~^~昏睡~ END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~未知~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~错误的动作代码~
 		END
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 		READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -7156,7 +7161,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
@@ -7200,7 +7205,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
@@ -7225,7 +7230,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		SPRINT newdesc ~%newdesc%~^~命中修正：%readspecial%~
@@ -7251,7 +7256,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		SPRINT newdesc ~%newdesc%~^~伤害修正：%readspecial%~
@@ -7316,7 +7321,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
@@ -7409,7 +7414,7 @@ BEGIN
 					END
 				END
 				PATCH_IF index < maxrows BEGIN
-					SPRINT newdesc ~%newdesc%~^~未知效果~
+					SPRINT newdesc ~%newdesc%~^~其它效果（#%readtype%）~
 				END
 			BUT_ONLY
 		END
@@ -7702,7 +7707,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		SPRINT newdesc ~%newdesc%~^~防御修正：%readspecial%~
@@ -8103,7 +8108,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
@@ -8559,7 +8564,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
@@ -9103,7 +9108,7 @@ BEGIN
 					END
 				END
 				PATCH_IF index != (maxrows + 1) BEGIN
-					SPRINT newdesc ~%newdesc%~^~未知效果~
+					SPRINT newdesc ~%newdesc%~^~其它效果（#%readtype%）~
 				END
 			BUT_ONLY
 		END
@@ -9182,7 +9187,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%武器附魔等级视为%readspecial%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
@@ -9691,7 +9696,7 @@ BEGIN
 			4 BEGIN SPRINT newdesc ~%newdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
 			5 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			6 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
@@ -9843,7 +9848,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
@@ -9863,7 +9868,7 @@ BEGIN
 					END
 				END
 				PATCH_IF index < maxrows BEGIN
-					SPRINT newdesc ~%newdesc%~^~未知效果~
+					SPRINT newdesc ~%newdesc%~^~其它效果（#%readtype%）~
 				END
 			BUT_ONLY
 		END
@@ -10051,7 +10056,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
@@ -10071,7 +10076,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
@@ -10091,7 +10096,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
@@ -10172,7 +10177,7 @@ BEGIN
 					END
 				END
 				PATCH_IF index < maxrows BEGIN
-					SPRINT newdesc ~%newdesc%~^~未知效果~
+					SPRINT newdesc ~%newdesc%~^~其它效果（#%readtype%）~
 				END
 			BUT_ONLY
 		END
@@ -10281,7 +10286,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
@@ -10494,7 +10499,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
@@ -10684,7 +10689,7 @@ BEGIN
 					SPRINT idsentry ~生物代码为%readres%~ 
 				END
 			END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
@@ -10857,7 +10862,7 @@ BEGIN
 			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
 			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
 			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（类型出错）~ SPRINT idsentry ~未知类型~
+			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
