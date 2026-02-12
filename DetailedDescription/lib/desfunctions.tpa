@@ -224,9 +224,11 @@ END
 
 /* **************************************** */
 
-//输入物品/生物/法术文件代码，文件不存在则给出空字符串
+//输入物品/生物/法术文件代码，文件不存在则给出“不存在的物品/生物/法术”
 
 DEFINE_PATCH_FUNCTION SCRAMBLED_TEXT_NAMECHECK
+INT_VAR
+	showname = 1
 STR_VAR
 	itmcode = ~~
 	crecode = ~~
@@ -250,7 +252,7 @@ BEGIN
 							SPRINT namestr ~未知物品~
 						END ELSE BEGIN	//已鉴定名称不是空文本	
 							LPF CHECK_GARBLED_TEXT INT_VAR descindex = nameref RET notgarbled END
-							PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~dd#garbl.2da~) BEGIN
+							PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) BEGIN
 								PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文已鉴定名称乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
 输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
 								PATCH_READLN howtodo
@@ -262,7 +264,7 @@ BEGIN
 									PATCH_PRINT ~原名称已弃用，后继情况会自动保持此选项。~
 									SPRINT namestr ~物品已鉴定名称原本乱码~
 									SET descdone = 1
-									INNER_ACTION BEGIN COPY ~DetailedDescription/2da/dd#garbl.2da~ ~override~ END
+									INNER_ACTION BEGIN COPY ~DetailedDescription/2da/SY#GARBL.2da~ ~override~ END
 								END ELSE BEGIN
 									PATCH_FAIL ~物品“%SOURCE_RES%.itm”已鉴定名称乱码，请检查，安装取消~
 								END
@@ -272,7 +274,7 @@ BEGIN
 									PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文已鉴定名称乱码情况，但不会导致游戏崩溃，已自动弃用原名称。~
 									SPRINT namestr ~物品已鉴定名称原本乱码~
 								END
-								PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~dd#garbl.2da~) THEN BEGIN
+								PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) THEN BEGIN
 									PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文已鉴定名称乱码情况，已弃用原名称并继续安装（但不保证解决问题）。~
 									SPRINT namestr ~物品已鉴定名称原本乱码~
 								END 
@@ -288,7 +290,7 @@ BEGIN
 								SPRINT namestr ~未知物品~
 							END ELSE BEGIN	//未鉴定名称不是空文本
 								LPF CHECK_GARBLED_TEXT INT_VAR descindex = nameref RET notgarbled END
-								PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~dd#garbl.2da~) BEGIN
+								PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) BEGIN
 									PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文未鉴定名称乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
 输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
 									PATCH_READLN howtodo
@@ -300,7 +302,7 @@ BEGIN
 										PATCH_PRINT ~原名称已弃用，后继情况会自动保持此选项。~
 										SPRINT namestr ~物品未鉴定名称原本乱码~
 										SET descdone = 1
-										INNER_ACTION BEGIN COPY ~DetailedDescription/2da/dd#garbl.2da~ ~override~ END
+										INNER_ACTION BEGIN COPY ~DetailedDescription/2da/SY#GARBL.2da~ ~override~ END
 									END ELSE BEGIN
 										PATCH_FAIL ~物品“%SOURCE_RES%.itm”未鉴定名称乱码，请检查，安装取消~
 									END
@@ -310,7 +312,7 @@ BEGIN
 										PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文未鉴定名称乱码情况，但不会导致游戏崩溃，已自动弃用原名称。~
 										SPRINT namestr ~物品未鉴定名称原本乱码~
 									END 
-									PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~dd#garbl.2da~) THEN BEGIN
+									PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) THEN BEGIN
 										PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文未鉴定名称乱码情况，已弃用原名称并继续安装（但不保证解决问题）。~
 										SPRINT namestr ~物品未鉴定名称原本乱码~
 									END 
@@ -327,7 +329,9 @@ BEGIN
 		END ELSE BEGIN	//代码存在但物品不存在
 			SPRINT namestr ~不存在的物品~
 		END
-		SPRINT namestr ~%namestr%~^~（%itmcode%）~
+		PATCH_IF showname == 1 BEGIN
+			SPRINT namestr ~%namestr%~^~（%itmcode%）~
+		END
 	END
 	//作为生物输入
 	PATCH_IF (STRING_LENGTH ~%crecode%~ > 0) BEGIN
@@ -343,7 +347,7 @@ BEGIN
 							SPRINT namestr ~未知生物~
 						END ELSE BEGIN	//已鉴定描述不是空文本
 							LPF CHECK_GARBLED_TEXT INT_VAR descindex = nameref RET notgarbled END
-							PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~dd#garbl.2da~) BEGIN
+							PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) BEGIN
 								PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文短名称乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
 输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
 								PATCH_READLN howtodo
@@ -355,7 +359,7 @@ BEGIN
 									PATCH_PRINT ~原名称已弃用，后继情况会自动保持此选项。~
 									SPRINT namestr ~生物短名称原本乱码~
 									SET descdone = 1
-									INNER_ACTION BEGIN COPY ~DetailedDescription/2da/dd#garbl.2da~ ~override~ END
+									INNER_ACTION BEGIN COPY ~DetailedDescription/2da/SY#GARBL.2da~ ~override~ END
 								END ELSE BEGIN
 									PATCH_FAIL ~生物“%SOURCE_RES%.cre”短名称乱码，请检查，安装取消~
 								END
@@ -365,7 +369,7 @@ BEGIN
 									PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文短名称乱码情况，但不会导致游戏崩溃，已自动弃用原名称。~
 									SPRINT namestr ~生物短名称原本乱码~
 								END 
-								PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~dd#garbl.2da~) THEN BEGIN
+								PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) THEN BEGIN
 									PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文短名称乱码情况，已弃用原名称并继续安装（但不保证解决问题）。~
 									SPRINT namestr ~生物短名称原本乱码~
 								END 
@@ -381,7 +385,7 @@ BEGIN
 								SPRINT namestr ~未知生物~
 							END ELSE BEGIN	//已鉴定描述不是空文本
 								LPF CHECK_GARBLED_TEXT INT_VAR descindex = nameref RET notgarbled END
-								PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~dd#garbl.2da~) BEGIN
+								PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) BEGIN
 									PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文长名称乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
 输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
 									PATCH_READLN howtodo
@@ -393,7 +397,7 @@ BEGIN
 										PATCH_PRINT ~原名称已弃用，后继情况会自动保持此选项。~
 										SPRINT namestr ~生物长名称原本乱码~
 										SET descdone = 1
-										INNER_ACTION BEGIN COPY ~DetailedDescription/2da/dd#garbl.2da~ ~override~ END
+										INNER_ACTION BEGIN COPY ~DetailedDescription/2da/SY#GARBL.2da~ ~override~ END
 									END ELSE BEGIN
 										PATCH_FAIL ~生物“%SOURCE_RES%.cre”长名称乱码，请检查，安装取消~
 									END
@@ -403,7 +407,7 @@ BEGIN
 										PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文长名称乱码情况，但不会导致游戏崩溃，已自动弃用原名称。~
 										SPRINT namestr ~生物长名称原本乱码~
 									END 
-									PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~dd#garbl.2da~) THEN BEGIN
+									PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) THEN BEGIN
 										PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文长名称乱码情况，已弃用原名称并继续安装（但不保证解决问题）。~
 										SPRINT namestr ~生物长名称原本乱码~
 									END 
@@ -420,7 +424,9 @@ BEGIN
 		END ELSE BEGIN	//代码存在但生物不存在
 			SPRINT namestr ~不存在的生物~
 		END
-		SPRINT namestr ~%namestr%~^~（%crecode%）~
+		PATCH_IF showname == 1 BEGIN
+			SPRINT namestr ~%namestr%~^~（%crecode%）~
+		END
 	END
 	//作为法术输入
 	PATCH_IF (STRING_LENGTH ~%splcode%~ > 0) BEGIN
@@ -437,7 +443,7 @@ BEGIN
 						END ELSE BEGIN	//已鉴定描述不是空文本
 					//PATCH_PRINT ~%nameref%:%namestr%~
 							LPF CHECK_GARBLED_TEXT INT_VAR descindex = nameref RET notgarbled END
-							PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~dd#garbl.2da~) BEGIN
+							PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) BEGIN
 								PATCH_PRINT ~法术“%SOURCE_RES%.spl”存在中文名称乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
 输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
 								PATCH_READLN howtodo
@@ -449,7 +455,7 @@ BEGIN
 									PATCH_PRINT ~原名称已弃用，后继情况会自动保持此选项。~
 									SPRINT namestr ~法术名称原本乱码~
 									SET descdone = 1
-									INNER_ACTION BEGIN COPY ~DetailedDescription/2da/dd#garbl.2da~ ~override~ END
+									INNER_ACTION BEGIN COPY ~DetailedDescription/2da/SY#GARBL.2da~ ~override~ END
 								END ELSE BEGIN
 									PATCH_FAIL ~法术“%SOURCE_RES%.spl”名称乱码，请检查，安装取消~
 								END
@@ -459,7 +465,7 @@ BEGIN
 									PATCH_PRINT ~法术“%SOURCE_RES%.spl”存在中文名称乱码情况，但不会导致游戏崩溃，已自动弃用原名称。~
 									SPRINT namestr ~法术名称原本乱码~
 								END 
-								PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~dd#garbl.2da~) THEN BEGIN
+								PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) THEN BEGIN
 									PATCH_PRINT ~法术“%SOURCE_RES%.spl”存在中文名称乱码情况，已弃用原名称并继续安装（但不保证解决问题）。~
 									SPRINT namestr ~法术名称原本乱码~
 								END 
@@ -475,7 +481,9 @@ BEGIN
 		END ELSE BEGIN	//代码存在但法术不存在
 			SPRINT namestr ~不存在的法术~
 		END
-		SPRINT namestr ~%namestr%~^~（%splcode%）~
+		PATCH_IF showname == 1 BEGIN
+			SPRINT namestr ~%namestr%~^~（%splcode%）~
+		END
 	END
 	
 	//所有代码为空
@@ -523,7 +531,7 @@ BEGIN
 		SET opcodemarch = 0	//瞬间生效类opcode，不需要显示持续时间
 		PATCH_FOR_EACH instantopcode IN 2 4 11 12 13 14 17 23 26 32 43 46 47 48 55 58 64 68 70 72 75 77 79 81 82 104 105 112 116 123 124 125 134 136 146 147 148 150 151 160 161 162 163 164 168 171 172 188 209 211 212 214 220 221 224 229 230 238 242 243 244 252 256 257 258 260 261 264 266 270 273 274 279 304 311 316 321 326 334 337 343 BEGIN
 			PATCH_IF opcode == instantopcode BEGIN SET opcodemarch = 1 END
-		END		
+		END
 		PATCH_IF (opcodemarch == 0) BEGIN
 			PATCH_IF (readtimemode == 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，持续：%readduration%秒~ END
 			PATCH_IF (readtimemode == 1) BEGIN SPRINT effectdesc ~%effectdesc%~^~，一直持续~ END
@@ -603,18 +611,25 @@ END
 
 DEFINE_PATCH_FUNCTION CHECK_ATTACH_EFFECT
 INT_VAR
+	effdetailed = 1
 	viaopcode = 0	//调用此eff文件的opcode
 STR_VAR
 	effectname = ~~
 RET
 	effectdesc	//给出{}包含的此eff文件具体描述
 BEGIN
-	SPRINT effectdesc ~{图像文字等}~
+	SPRINT effectdesc ~{其它效果，如图像文字等}~
 
 	PATCH_IF FILE_EXISTS_IN_GAME ~%effectname%.eff~ BEGIN
 		INNER_ACTION BEGIN
 			COPY_EXISTING ~%effectname%.eff~ ~override~	
 				READ_LONG 0x10 opcode
+				
+				PATCH_IF effdetailed = 0 BEGIN	//如果不追求详细描述，有些效果就不处理了
+					PATCH_IF ((opcode == 318)||(opcode == 321)||(opcode == 324)||(opcode == 326)||(opcode == 328)) BEGIN
+						SET opcode = 999
+					END
+				END
 				
 				PATCH_IF opcode == 0 BEGIN
 					READ_LONG 0x1c readamount
@@ -777,10 +792,10 @@ BEGIN
 					PATCH_IF (readtype2 == 1024) BEGIN SPRINT effectdesc ~{魔法寒冷伤害~ SET descfixed = 1 END
 					PATCH_IF (readtype2 == 2048) BEGIN SPRINT effectdesc ~{瘀伤~ SET descfixed = 1 END
 					PATCH_IF (descfixed == 1) BEGIN
-						PATCH_IF (readtype1 == 0) BEGIN SPRINT effectdesc ~：~ SET descfixed = 2 END
-						PATCH_IF (readtype1 == 1) BEGIN SPRINT effectdesc ~（HP设为）：~ SET descfixed = 2 END
-						PATCH_IF (readtype1 == 2) BEGIN SPRINT effectdesc ~（HP设为百分比）：~ SET descfixed = 2 END
-						PATCH_IF (readtype1 == 3) BEGIN SPRINT effectdesc ~（HP失去百分比）：~ SET descfixed = 2 END						
+						PATCH_IF (readtype1 == 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~：~ SET descfixed = 2 END
+						PATCH_IF (readtype1 == 1) BEGIN SPRINT effectdesc ~%effectdesc%~^~（HP设为）：~ SET descfixed = 2 END
+						PATCH_IF (readtype1 == 2) BEGIN SPRINT effectdesc ~%effectdesc%~^~（HP设为百分比）：~ SET descfixed = 2 END
+						PATCH_IF (readtype1 == 3) BEGIN SPRINT effectdesc ~%effectdesc%~^~（HP失去百分比）：~ SET descfixed = 2 END						
 					END
 					PATCH_IF (descfixed == 2) BEGIN
 						PATCH_IF (readdiceamonut != 0) && (readdicesize != 0) BEGIN
@@ -1514,17 +1529,19 @@ BEGIN
 
 				PATCH_IF opcode == 67 BEGIN
 					READ_LONG 0x20 readtype
-					READ_ASCII 0x30 readres
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR crecode = EVAL ~%readres%~ RET namestr END
-					SPRINT effectdesc ~{召唤生物：%namestr%~
-					PATCH_MATCH readtype
-					WITH
-						0 1 3 BEGIN SPRINT effectdesc ~%effectdesc%~^~（与目标敌友类型一致，无目标则敌对）~ END
-						2 4 6 8 255 BEGIN SPRINT effectdesc ~%effectdesc%~^~（敌友类型由生物本身决定）~ END
-						5 BEGIN SPRINT effectdesc ~%effectdesc%~^~（与目标敌对）~ END
-						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的敌友类型代码）~
+					READ_ASCII 0x30 readres					
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR crecode = EVAL ~%readres%~ RET namestr END					
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的生物~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知生物~)||(effdetailed == 1))) BEGIN
+						SPRINT effectdesc ~{召唤生物：%namestr%~
+						PATCH_MATCH readtype
+						WITH
+							0 1 3 BEGIN SPRINT effectdesc ~%effectdesc%~^~（与目标敌友类型一致，无目标则敌对）~ END
+							2 4 6 8 255 BEGIN SPRINT effectdesc ~%effectdesc%~^~（敌友类型由生物本身决定）~ END
+							5 BEGIN SPRINT effectdesc ~%effectdesc%~^~（与目标敌对）~ END
+							DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的敌友类型代码）~
+						END
+						LPF APPEND_ATTACH_DESC INT_VAR vopcode = viaopcode STR_VAR adesc = EVAL ~%effectdesc%~ RET effectdesc END
 					END
-					LPF APPEND_ATTACH_DESC INT_VAR vopcode = viaopcode STR_VAR adesc = EVAL ~%effectdesc%~ RET effectdesc END
 				END
 
 				PATCH_IF opcode == 68 BEGIN
@@ -2104,8 +2121,8 @@ BEGIN
 				PATCH_IF opcode == 111 BEGIN
 					READ_LONG 0x1c readamount
 					READ_ASCII 0x30 readres
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{产生魔法武器：%namestr%，数量%readamount%~
 						READ_LONG 0x38 readdiceamonut
 						PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -2117,8 +2134,8 @@ BEGIN
 				
 				PATCH_IF opcode == 112 BEGIN
 					READ_ASCII 0x30 readres
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{移除物品：%namestr%~
 						READ_LONG 0x38 readdiceamonut
 						PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -2201,13 +2218,12 @@ BEGIN
 					READ_ASCII 0x70 readres2
 					READ_ASCII 0x78 readres3
 					SET descfixed = 0
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr0 = namestr END
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres2%~ RET namestr1 = namestr END
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres3%~ RET namestr2 = namestr END
-					PATCH_IF (STRING_LENGTH namestr0 > 0) BEGIN SET descfixed = 1 END
-					PATCH_IF (STRING_LENGTH namestr1 > 0) BEGIN SET descfixed = 2 END
-					PATCH_IF (STRING_LENGTH namestr2 > 0) BEGIN SET descfixed = 3 END
-					//物品不存在时，归还的namestr为空
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr0 = namestr END
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres2%~ RET namestr1 = namestr END
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres3%~ RET namestr2 = namestr END
+					PATCH_IF ((~%namestr0%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr0%~ STRING_CONTAINS_REGEXP ~未知物品~)||(effdetailed == 1))) BEGIN SET descfixed = 1 END
+					PATCH_IF ((~%namestr1%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr1%~ STRING_CONTAINS_REGEXP ~未知物品~)||(effdetailed == 1))) BEGIN SET descfixed = 2 END
+					PATCH_IF ((~%namestr2%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr2%~ STRING_CONTAINS_REGEXP ~未知物品~)||(effdetailed == 1))) BEGIN SET descfixed = 3 END
 					PATCH_IF (descfixed == 1) BEGIN
 						SPRINT effectdesc ~{创建物品栏物品：%namestr0%，数量%readamount%~
 						PATCH_IF (readpara3 > 0)||(readpara4 > 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~／%readpara3%~ END
@@ -2246,8 +2262,8 @@ BEGIN
 				
 				PATCH_IF opcode == 123 BEGIN
 					READ_ASCII 0x30 readres
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{移除物品栏物品：%namestr%~
 						READ_LONG 0x38 readdiceamonut
 						PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -2395,7 +2411,7 @@ BEGIN
 							LOOKUP_IDS_SYMBOL_OF_INT namestr ~EA~ readpara4
 							SET descfixed = 1
 						END ELSE BEGIN
-							LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR crecode = EVAL ~%readres%~ RET namestr END
+							LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR crecode = EVAL ~%readres%~ RET namestr END
 							SET descfixed = 1
 						END
 					END
@@ -2471,8 +2487,8 @@ BEGIN
 					PATCH_IF (readamount == 16) BEGIN SPRINT idsentry ~SLOT_MISC1（QUICK1）~ END
 					PATCH_IF (readamount == 17) BEGIN SPRINT idsentry ~SLOT_MISC2（QUICK2）~ END
 					PATCH_IF (readamount == 34) BEGIN SPRINT idsentry ~SLOT_MISC19（Magical_Weapon）~ END
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{在%idsentry%栏创建物品：%namestr%~
 						READ_LONG 0x38 readdiceamonut
 						PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -2531,8 +2547,8 @@ BEGIN
 					READ_LONG 0x20 readtype
 					READ_ASCII 0x30 readres
 					SET descfixed = 0
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(effdetailed == 1))) BEGIN
 						PATCH_IF (readamount == 0)&&(readtype == 0) BEGIN SPRINT effectdesc ~{以人物等级施法：%namestr%~ SET descfixed = 1 END
 						PATCH_IF (readamount != 0)&&(readtype == 0) BEGIN SPRINT effectdesc ~{以等级%readamount%施法：%namestr%~ SET descfixed = 1 END
 						PATCH_IF (readtype == 1) BEGIN SPRINT effectdesc ~{以人物等级瞬间施法：%namestr%~ SET descfixed = 1 END
@@ -2551,8 +2567,8 @@ BEGIN
 
 				PATCH_IF opcode == 147 BEGIN
 					READ_ASCII 0x30 readres
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{学习法术：%namestr%~
 						LPF APPEND_ATTACH_DESC INT_VAR vopcode = viaopcode STR_VAR adesc = EVAL ~%effectdesc%~ RET effectdesc END
 					END
@@ -2563,8 +2579,8 @@ BEGIN
 					READ_LONG 0x20 readtype
 					READ_ASCII 0x30 readres
 					SET descfixed = 0
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(effdetailed == 1))) BEGIN
 						PATCH_IF (readtype == 0) BEGIN SPRINT effectdesc ~{以等级%readamount%向目的地施法：%namestr%~ SET descfixed = 1 END
 						PATCH_IF (readtype == 1) BEGIN SPRINT effectdesc ~{瞬间向目的地施法：%namestr%~ SET descfixed = 1 END
 					END
@@ -2728,8 +2744,8 @@ BEGIN
 
 				PATCH_IF opcode == 171 BEGIN
 					READ_ASCII 0x30 readres
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{获得能力或法术：%namestr%~
 						LPF APPEND_ATTACH_DESC INT_VAR vopcode = viaopcode STR_VAR adesc = EVAL ~%effectdesc%~ RET effectdesc END
 					END
@@ -2737,8 +2753,8 @@ BEGIN
 
 				PATCH_IF opcode == 172 BEGIN
 					READ_ASCII 0x30 readres
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{失去能力或法术：%namestr%~
 						LPF APPEND_ATTACH_DESC INT_VAR vopcode = viaopcode STR_VAR adesc = EVAL ~%effectdesc%~ RET effectdesc END
 					END
@@ -2882,8 +2898,8 @@ BEGIN
 				
 				PATCH_IF opcode == 180 BEGIN
 					READ_ASCII 0x30 readres
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{禁止使用物品：%namestr%~
 						READ_LONG 0x38 readdiceamonut
 						PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -3172,8 +3188,8 @@ BEGIN
 				PATCH_IF opcode == 206 BEGIN
 					READ_ASCII 0x30 readres
 					SET descfixed = 0
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{防护法术：%namestr%~
 						PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[法师]~ END
 						PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[牧师]~ END
@@ -3191,8 +3207,8 @@ BEGIN
 				PATCH_IF opcode == 207 BEGIN
 					READ_ASCII 0x30 readres
 					SET descfixed = 0
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{反弹法术：%namestr%~
 						PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[法师]~ END
 						PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[牧师]~ END
@@ -3309,7 +3325,6 @@ BEGIN
 					SPRINT effectdesc ~{对特定生物类型：~
 					READ_LONG 0x1c readamount
 					READ_LONG 0x20 readtype
-					READ_LONG 0x48 readspecial
 					PATCH_MATCH readtype
 					WITH
 						2 BEGIN SPRINT effectdesc ~%effectdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
@@ -3323,7 +3338,7 @@ BEGIN
 						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 					END
 					SPRINT effectdesc ~%effectdesc%~^~%idsentry%~
-					SPRINT effectdesc ~%effectdesc%~^~防御修正：%readspecial%~
+					SPRINT effectdesc ~%effectdesc%~^~获得2点防御和豁免修正~
 					READ_LONG 0x38 readdiceamonut
 					PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
 					READ_LONG 0x3c readdicesize
@@ -3611,8 +3626,7 @@ BEGIN
 						3 BEGIN SPRINT effectdesc ~%effectdesc%~^~时，对最近的对象施法：~ END
 						DEFAULT SPRINT effectdesc ~%effectdesc%~^~（对象出错）~
 					END
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr == 0) BEGIN SPRINT namestr ~法术文件缺失~ END
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
 					SPRINT effectdesc ~%effectdesc%~^~%namestr%~
 					READ_LONG 0x38 readdiceamonut
 					PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -3623,7 +3637,10 @@ BEGIN
 				
 				PATCH_IF opcode == 233 BEGIN
 					READ_LONG 0x1c readamount
-					READ_LONG 0x20 readtype
+					SET readamount1 = readamount / 8	//original class
+					SET readamount = readamount MODULO 8	//active class
+					READ_BYTE 0x20 readtype
+					READ_BYTE 0x22 readmode
 					SET descfixed = 0
 					PATCH_IF !VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
 						INNER_ACTION BEGIN
@@ -3642,11 +3659,25 @@ BEGIN
 							BUT_ONLY
 						END
 					END
-					PATCH_IF VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
+					PATCH_IF (VARIABLE_IS_SET $wprof_namestring("%readtype%") && (readmode == 0 || readmode == 1) && (readamount1 >= 0)) BEGIN
 						SPRINT temp_string $wprof_namestring(~%readtype%~)
 						SET descfixed = 1
 					END
-					PATCH_IF (descfixed == 1) && (readamount >= 0) && (readamount < 6) BEGIN SPRINT effectdesc ~{设置%temp_string%熟练度为%readamount%~ END ELSE BEGIN SET descfixed = 0 END
+					PATCH_IF (descfixed == 1) BEGIN
+						PATCH_IF (readamount1 > 0) BEGIN	//有旧职业
+							PATCH_IF (readmode == 0) BEGIN
+								SPRINT effectdesc ~{设置旧职业%temp_string%熟练度为%readamount%星，新职业%temp_string%熟练度为%readamount1%星~
+							END ELSE BEGIN
+								SPRINT effectdesc ~{提升旧职业%temp_string%熟练度%readamount%星，新职业%temp_string%熟练度%readamount1%星~
+							END
+						END ELSE BEGIN	//readamount1 = 0只有当前职业
+							PATCH_IF (readmode == 0) BEGIN
+								SPRINT effectdesc ~{设置%temp_string%熟练度为%readamount%星~
+							END ELSE BEGIN
+								SPRINT effectdesc ~{提升%temp_string%熟练度%readamount%星~
+							END
+						END
+					END
 					PATCH_IF (descfixed == 1) BEGIN
 						READ_LONG 0x38 readdiceamonut
 						PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -3874,8 +3905,8 @@ BEGIN
 					READ_ASCII 0x30 readres
 					READ_LONG 0x60 readpara3
 					READ_LONG 0x64 readpara4
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{创建物品栏物品，存在持续时间﹡天数：%namestr%，数量%readamount%~
 						PATCH_IF (readpara3 > 0)||(readpara4 > 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~／%readpara3%~ END
 						PATCH_IF readpara4 > 0 BEGIN SPRINT effectdesc ~%effectdesc%~^~／%readpara4%~ END
@@ -4472,15 +4503,17 @@ BEGIN
 							END
 						BUT_ONLY
 					END
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)||(effdetailed == 1)) BEGIN
 						SPRINT effectdesc ~%effectdesc%~^~法术效果（%namestr%）~
 						PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[法师]~ END
 						PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[牧师]~ END
 						SET descfixed = 1
 					END
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~物品效果（%namestr%）~ SET descfixed = 2 END
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)||(effdetailed == 1)) BEGIN
+						SPRINT effectdesc ~%effectdesc%~^~物品效果（%namestr%）~ SET descfixed = 2
+					END
 					PATCH_IF (descfixed > 0) BEGIN
 						READ_LONG 0x38 readdiceamonut
 						PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -4508,16 +4541,20 @@ BEGIN
 					SPRINT effectdesc ~{移除特定法术／物品等效果：~
 					SET descfixed = 0
 					PATCH_IF (FILE_EXISTS_IN_GAME ~%readres%.spl~)&&((readtype == 0)||(readtype == 2)) BEGIN
-						LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-						SPRINT effectdesc ~%effectdesc%~^~法术效果（%namestr%）~
-						PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[法师]~ END
-						PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[牧师]~ END
-						SET descfixed = 1
+						LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+						PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)||(effdetailed == 1)) BEGIN
+							SPRINT effectdesc ~%effectdesc%~^~法术效果（%namestr%）~
+							PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[法师]~ END
+							PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[牧师]~ END
+							SET descfixed = 1
+						END
 					END
 					PATCH_IF (FILE_EXISTS_IN_GAME ~%readres%.itm~)&&((readtype == 0)||(readtype == 1)) BEGIN
-						LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-						SPRINT effectdesc ~%effectdesc%~^~物品效果（%namestr%）~
-						SET descfixed = 2
+						LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+						PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)||(effdetailed == 1)) BEGIN
+							SPRINT effectdesc ~%effectdesc%~^~物品效果（%namestr%）~
+							SET descfixed = 2
+						END
 					END
 					PATCH_IF (descfixed > 0) BEGIN
 						READ_LONG 0x38 readdiceamonut
@@ -4608,12 +4645,10 @@ BEGIN
 							END
 						BUT_ONLY
 					END
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
-						SPRINT effectdesc ~%effectdesc%~^~（%namestr%）~
-						PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[法师]~ END
-						PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[牧师]~ END
-					END
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+					SPRINT effectdesc ~%effectdesc%~^~（%namestr%）~
+					PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[法师]~ END
+					PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effectdesc ~%effectdesc%~^~[牧师]~ END
 					READ_LONG 0x38 readdiceamonut
 					PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
 					READ_LONG 0x3c readdicesize
@@ -4932,8 +4967,8 @@ BEGIN
 
 				PATCH_IF opcode == 366 BEGIN
 					READ_ASCII 0x30 readres
-					LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-					PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = effdetailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+					PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(effdetailed == 1))) BEGIN
 						SPRINT effectdesc ~{移动时施展法术：%namestr%~
 						READ_LONG 0x38 readdiceamonut
 						PATCH_IF (readdiceamonut != 0) BEGIN SPRINT effectdesc ~%effectdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -5064,7 +5099,7 @@ END
 
 DEFINE_PATCH_FUNCTION CHECK_ATTACK_EFFECT
 INT_VAR
-	//pability = 1
+	detailed = 1
 	firsteff = 0 //输入当前ability下第一个eff的编号
 	effectnum = 1	//从firsteff数起第几个eff
 STR_VAR
@@ -5076,6 +5111,12 @@ BEGIN
 	READ_LONG 0x64 abilityoffset
 	READ_LONG 0x6a effoffset
 	READ_SHORT (effoffset + 0x30 * (firsteff + effectnum - 1)) opcode
+	
+	PATCH_IF detailed = 0 BEGIN	//如果不追求详细描述，有些效果就不处理了
+		PATCH_IF ((opcode == 318)||(opcode == 321)||(opcode == 324)||(opcode == 326)||(opcode == 328)) BEGIN
+			SET opcode = 999
+		END
+	END
 
 //PATCH_PRINT ~firsteff=%firsteff% effectnum=%effectnum%~
 //PATCH_PRINT ~abilityoffset=%abilityoffset% effoffset=%effoffset% opcode=%opcode%~	
@@ -5972,16 +6013,18 @@ BEGIN
 	PATCH_IF opcode == 67 BEGIN
 		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR crecode = EVAL ~%readres%~ RET namestr END
-		SPRINT newdesc ~%newdesc%~^~%WNL%－召唤生物：%namestr%~
-		PATCH_MATCH readtype
-		WITH
-			0 1 3 BEGIN SPRINT newdesc ~%newdesc%~^~（与目标敌友类型一致，无目标则敌对）~ END
-			2 4 6 8 255 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型由生物本身决定）~ END
-			5 BEGIN SPRINT newdesc ~%newdesc%~^~（与目标敌对）~ END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的敌友类型代码）~
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR crecode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的生物~)||(detailed == 1)) BEGIN
+			SPRINT newdesc ~%newdesc%~^~%WNL%－召唤生物：%namestr%~
+			PATCH_MATCH readtype
+			WITH
+				0 1 3 BEGIN SPRINT newdesc ~%newdesc%~^~（与目标敌友类型一致，无目标则敌对）~ END
+				2 4 6 8 255 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型由生物本身决定）~ END
+				5 BEGIN SPRINT newdesc ~%newdesc%~^~（与目标敌对）~ END
+				DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的敌友类型代码）~
+			END
+			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 		END
-		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 	END
 
 	PATCH_IF opcode == 68 BEGIN
@@ -6546,8 +6589,8 @@ BEGIN
 	PATCH_IF opcode == 111 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (firsteff + effectnum - 1)) readamount
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－产生魔法武器：%namestr%，数量%readamount%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -6559,8 +6602,8 @@ BEGIN
 	
 	PATCH_IF opcode == 112 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－移除物品：%namestr%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -6638,8 +6681,8 @@ BEGIN
 	PATCH_IF opcode == 122 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (firsteff + effectnum - 1)) readamount
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－创建物品栏物品：%namestr%，数量%readamount%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -6651,8 +6694,8 @@ BEGIN
 	
 	PATCH_IF opcode == 123 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－移除物品栏物品：%namestr%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -6793,7 +6836,7 @@ BEGIN
 		PATCH_IF (STRING_LENGTH readres == 0) || (NOT FILE_EXISTS_IN_GAME ~%readres%.cre~) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－解除变形~ SET descfixed = 1
 		END ELSE BEGIN
-			LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR crecode = EVAL ~%readres%~ RET namestr END
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR crecode = EVAL ~%readres%~ RET namestr END
 			PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为：%namestr%（数值和外形均改变）~ SET descfixed = 1 END
 			PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为：%namestr%（仅外形改变）~ SET descfixed = 1 END
 		END
@@ -6864,8 +6907,8 @@ BEGIN
 		PATCH_IF (readamount == 16) BEGIN SPRINT idsentry ~SLOT_MISC1（QUICK1）~ END
 		PATCH_IF (readamount == 17) BEGIN SPRINT idsentry ~SLOT_MISC2（QUICK2）~ END
 		PATCH_IF (readamount == 34) BEGIN SPRINT idsentry ~SLOT_MISC19（Magical_Weapon）~ END
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－在%idsentry%栏创建物品：%namestr%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -6924,8 +6967,8 @@ BEGIN
 		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
 		SET descfixed = 0
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			PATCH_IF (readamount == 0)&&(readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以人物等级施法：%namestr%~ SET descfixed = 1 END
 			PATCH_IF (readamount != 0)&&(readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%施法：%namestr%~ SET descfixed = 1 END
 			PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以人物等级瞬间施法：%namestr%~ SET descfixed = 1 END
@@ -6944,8 +6987,8 @@ BEGIN
 
 	PATCH_IF opcode == 147 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－学习法术：%namestr%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 		END
@@ -6956,8 +6999,8 @@ BEGIN
 		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
 		SET descfixed = 0
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－以等级%readamount%向目的地施法：%namestr%~ SET descfixed = 1 END
 			PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－瞬间向目的地施法：%namestr%~ SET descfixed = 1 END
 		END
@@ -7121,8 +7164,8 @@ BEGIN
 
 	PATCH_IF opcode == 171 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－获得能力或法术：%namestr%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 		END
@@ -7130,8 +7173,8 @@ BEGIN
 
 	PATCH_IF opcode == 172 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－失去能力或法术：%namestr%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 		END
@@ -7193,26 +7236,28 @@ BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (firsteff + effectnum - 1)) readamount
 		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%：~
-		PATCH_MATCH readtype
-		WITH
-			2 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
-			3 BEGIN SPRINT newdesc ~%newdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
-			4 BEGIN SPRINT newdesc ~%newdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
-			5 BEGIN SPRINT newdesc ~%newdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
-			6 BEGIN SPRINT newdesc ~%newdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
-			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
-			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
-			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%：~
+			PATCH_MATCH readtype
+			WITH
+				2 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+				3 BEGIN SPRINT newdesc ~%newdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+				4 BEGIN SPRINT newdesc ~%newdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+				5 BEGIN SPRINT newdesc ~%newdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+				6 BEGIN SPRINT newdesc ~%newdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+				7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+				8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+				9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+				DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+			END
+			SPRINT newdesc ~%newdesc%~^~%idsentry%~
+			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
+			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
+			PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
+			READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
+			PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
 		END
-		SPRINT newdesc ~%newdesc%~^~%idsentry%~
-		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
-		READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
-		PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
-		READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
-		PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
 	END
 
 	PATCH_IF opcode == 178 BEGIN
@@ -7269,8 +7314,8 @@ BEGIN
 	
 	PATCH_IF opcode == 180 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－禁止使用物品：%namestr%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -7559,8 +7604,8 @@ BEGIN
 	PATCH_IF opcode == 206 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
 		SET descfixed = 0
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－防护法术：%namestr%~
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
@@ -7578,8 +7623,8 @@ BEGIN
 	PATCH_IF opcode == 207 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
 		SET descfixed = 0
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－反弹法术：%namestr%~
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
@@ -7696,7 +7741,6 @@ BEGIN
 		SPRINT newdesc ~%newdesc%~^~%WNL%－对特定生物类型：~
 		READ_LONG (4 + effoffset + 0x30 * (firsteff + effectnum - 1)) readamount
 		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
-		READ_LONG (44 + effoffset + 0x30 * (firsteff + effectnum - 1)) readspecial
 		PATCH_MATCH readtype
 		WITH
 			2 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
@@ -7710,7 +7754,7 @@ BEGIN
 			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
 		END
 		SPRINT newdesc ~%newdesc%~^~%idsentry%~
-		SPRINT newdesc ~%newdesc%~^~防御修正：%readspecial%~
+		SPRINT newdesc ~%newdesc%~^~获得2点防御和豁免修正~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 		READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
 		PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -7998,7 +8042,7 @@ BEGIN
 			3 BEGIN SPRINT newdesc ~%newdesc%~^~时，对最近的对象施法：~ END
 			DEFAULT SPRINT newdesc ~%newdesc%~^~（对象出错）~
 		END
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
 		SPRINT newdesc ~%newdesc%~^~%namestr%~
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 		READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -8009,7 +8053,10 @@ BEGIN
 	
 	PATCH_IF opcode == 233 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (firsteff + effectnum - 1)) readamount
-		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
+		SET readamount1 = readamount / 8	//original class
+		SET readamount = readamount MODULO 8	//active class
+		READ_BYTE (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
+		READ_BYTE (10 + effoffset + 0x30 * (firsteff + effectnum - 1)) readmode
 		SET descfixed = 0
 		PATCH_IF !VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
 			INNER_ACTION BEGIN
@@ -8028,11 +8075,25 @@ BEGIN
 				BUT_ONLY
 			END
 		END
-		PATCH_IF VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
+		PATCH_IF (VARIABLE_IS_SET $wprof_namestring("%readtype%") && (readmode == 0 || readmode == 1) && (readamount1 >= 0)) BEGIN
 			SPRINT temp_string $wprof_namestring(~%readtype%~)
 			SET descfixed = 1
 		END
-		PATCH_IF (descfixed == 1) && (readamount >= 0) && (readamount < 6) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置%temp_string%熟练度为%readamount%~ END ELSE BEGIN SET descfixed = 0 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF (readamount1 > 0) BEGIN	//有旧职业
+				PATCH_IF (readmode == 0) BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%－设置旧职业%temp_string%熟练度为%readamount%星，新职业%temp_string%熟练度为%readamount1%星~
+				END ELSE BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%－提升旧职业%temp_string%熟练度%readamount%星，新职业%temp_string%熟练度%readamount1%星~
+				END
+			END ELSE BEGIN	//readamount1 = 0只有当前职业
+				PATCH_IF (readmode == 0) BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%－设置%temp_string%熟练度为%readamount%星~
+				END ELSE BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%－提升%temp_string%熟练度%readamount%星~
+				END
+			END
+		END
 		PATCH_IF (descfixed == 1) BEGIN
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -8207,10 +8268,26 @@ BEGIN
 		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
 		SET descfixed = 0
-		PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置近战攻击触发特定效果~ SET descfixed = 1 END
-		PATCH_IF (readtype == 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置徒手攻击触发特定效果~ SET descfixed = 1 END
-		PATCH_IF (descfixed == 1) BEGIN
-			LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置近战攻击触发特定效果~ SET descfixed = 1 END
+			PATCH_IF (readtype == 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置徒手攻击触发特定效果~ SET descfixed = 1 END
+			PATCH_IF (descfixed == 1) BEGIN			
+				SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+				LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
+				READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
+				PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
+				READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
+				PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
+			END
+		END
+	END
+	
+	PATCH_IF opcode == 249 BEGIN
+		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
+		SPRINT newdesc ~%newdesc%~^~%WNL%－设置远程攻击触发特定效果~
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
 			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -8218,18 +8295,6 @@ BEGIN
 			READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
 			PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
 		END
-	END
-	
-	PATCH_IF opcode == 249 BEGIN
-		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		SPRINT newdesc ~%newdesc%~^~%WNL%－设置远程攻击触发特定效果~
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%~
-		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
-		READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
-		PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
-		READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
-		PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
 	END
 	
 	PATCH_IF opcode == 250 BEGIN
@@ -8264,8 +8329,8 @@ BEGIN
 	PATCH_IF opcode == 255 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (firsteff + effectnum - 1)) readamount
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－创建物品栏物品，存在持续时间﹡天数：%namestr%，数量%readamount%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -8392,18 +8457,20 @@ BEGIN
 		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
 		SET descfixed = 0
-		PATCH_IF (readtype == 0)&&(readamount != 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每秒一次，重复应用特定效果~ SET descfixed = 1 END
-		PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－应用特定效果~ SET descfixed = 1 END
-		PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每秒%readamount%次，重复应用特定效果~ SET descfixed = 1 END
-		PATCH_IF (readtype == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每%readamount%秒一次，重复应用特定效果~ SET descfixed = 1 END
-		PATCH_IF (descfixed == 1) BEGIN
-			LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
-			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
-			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
-			PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
-			READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
-			PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			PATCH_IF (readtype == 0)&&(readamount != 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每秒一次，重复应用特定效果~ SET descfixed = 1 END
+			PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－应用特定效果~ SET descfixed = 1 END
+			PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每秒%readamount%次，重复应用特定效果~ SET descfixed = 1 END
+			PATCH_IF (readtype == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每%readamount%秒一次，重复应用特定效果~ SET descfixed = 1 END
+			PATCH_IF (descfixed == 1) BEGIN
+				SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+				LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
+				READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
+				PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
+				READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
+				PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
+			END
 		END
 	END
 
@@ -8552,26 +8619,28 @@ BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (firsteff + effectnum - 1)) readamount
 		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%：~
-		PATCH_MATCH readtype
-		WITH
-			2 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
-			3 BEGIN SPRINT newdesc ~%newdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
-			4 BEGIN SPRINT newdesc ~%newdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
-			5 BEGIN SPRINT newdesc ~%newdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
-			6 BEGIN SPRINT newdesc ~%newdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
-			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
-			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
-			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%：~
+			PATCH_MATCH readtype
+			WITH
+				2 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+				3 BEGIN SPRINT newdesc ~%newdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+				4 BEGIN SPRINT newdesc ~%newdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+				5 BEGIN SPRINT newdesc ~%newdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+				6 BEGIN SPRINT newdesc ~%newdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+				7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+				8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+				9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+				DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+			END
+			SPRINT newdesc ~%newdesc%~^~%idsentry%~
+			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
+			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
+			PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
+			READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
+			PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
 		END
-		SPRINT newdesc ~%newdesc%~^~%idsentry%~
-		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
-		READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
-		PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
-		READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
-		PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
 	END
 
 	PATCH_IF opcode == 284 BEGIN
@@ -8858,15 +8927,15 @@ BEGIN
 				END
 			BUT_ONLY
 		END
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~法术效果（%namestr%）~
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
 			SET descfixed = 1
 		END
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN SPRINT newdesc ~%newdesc%~^~物品效果（%namestr%）~ SET descfixed = 2 END
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed == 1))) BEGIN SPRINT newdesc ~%newdesc%~^~物品效果（%namestr%）~ SET descfixed = 2 END
 		PATCH_IF (descfixed > 0) BEGIN
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -8893,15 +8962,18 @@ BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
 		SPRINT newdesc ~%newdesc%~^~%WNL%－移除特定法术／物品等效果：~
 		SET descfixed = 0
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		PATCH_IF (FILE_EXISTS_IN_GAME ~%readres%.spl~)&&((readtype == 0)||(readtype == 2)) BEGIN
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
 			SPRINT newdesc ~%newdesc%~^~法术效果（%namestr%）~
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
 			SET descfixed = 1
 		END
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN SPRINT newdesc ~%newdesc%~^~物品效果（%namestr%）~ SET descfixed = 2 END
+		PATCH_IF (FILE_EXISTS_IN_GAME ~%readres%.itm~)&&((readtype == 0)||(readtype == 1)) BEGIN
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+			SPRINT newdesc ~%newdesc%~^~物品效果（%namestr%）~
+			SET descfixed = 2
+		END
 		PATCH_IF (descfixed > 0) BEGIN
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -8991,12 +9063,10 @@ BEGIN
 				END
 			BUT_ONLY
 		END
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
-			SPRINT newdesc ~%newdesc%~^~（%namestr%）~
-			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
-			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
-		END
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		SPRINT newdesc ~%newdesc%~^~（%namestr%）~
+		PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
+		PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
 		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 		READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
 		PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
@@ -9133,13 +9203,15 @@ BEGIN
 	PATCH_IF opcode == 340 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
 		SPRINT newdesc ~%newdesc%~^~%WNL%－背刺造成指定效果~
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%~
-		LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
-		READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
-		PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
-		READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
-		PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
+			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
+			PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
+			READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
+			PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
+		END
 	END
 
 	PATCH_IF opcode == 341 BEGIN
@@ -9148,18 +9220,20 @@ BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
 		READ_LONG (44 + effoffset + 0x30 * (firsteff + effectnum - 1)) readspecial
 		SET descfixed = 0
-		PATCH_IF (readspecial == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－致命一击造成指定效果~ SET descfixed = 1 END
-		PATCH_IF (readspecial == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－近战致命一击造成指定效果~ SET descfixed = 1 END
-		PATCH_IF (readspecial == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－远程致命一击造成指定效果~ SET descfixed = 1 END
-		PATCH_IF (readspecial == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－法术致命一击造成指定效果~ SET descfixed = 1 END
-		PATCH_IF (descfixed == 1) BEGIN
-			LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
-			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
-			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
-			PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
-			READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
-			PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			PATCH_IF (readspecial == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－致命一击造成指定效果~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－近战致命一击造成指定效果~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－远程致命一击造成指定效果~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－法术致命一击造成指定效果~ SET descfixed = 1 END
+			PATCH_IF (descfixed == 1) BEGIN
+				SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+				LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
+				READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
+				PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
+				READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
+				PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
+			END
 		END
 	END
 
@@ -9247,18 +9321,20 @@ BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
 		READ_LONG (44 + effoffset + 0x30 * (firsteff + effectnum - 1)) readspecial
 		SET descfixed = 0
-		PATCH_IF (readspecial == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－致命失误造成指定效果~ SET descfixed = 1 END
-		PATCH_IF (readspecial == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－近战致命失误造成指定效果~ SET descfixed = 1 END
-		PATCH_IF (readspecial == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－远程致命失误造成指定效果~ SET descfixed = 1 END
-		PATCH_IF (readspecial == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－法术致命失误造成指定效果~ SET descfixed = 1 END
-		PATCH_IF (descfixed == 1) BEGIN
-			LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
-			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
-			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
-			PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
-			READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
-			PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			PATCH_IF (readspecial == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－致命失误造成指定效果~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－近战致命失误造成指定效果~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－远程致命失误造成指定效果~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－法术致命失误造成指定效果~ SET descfixed = 1 END
+			PATCH_IF (descfixed == 1) BEGIN
+				SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+				LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
+				READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
+				PATCH_IF (readdiceamonut != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最高影响%readdiceamonut%级生物~ END
+				READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesize
+				PATCH_IF (readdicesize != 0) BEGIN SPRINT newdesc ~%newdesc%~^~，最低影响%readdicesize%级生物~ END
+			END
 		END
 	END
 
@@ -9295,8 +9371,8 @@ BEGIN
 
 	PATCH_IF opcode == 366 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－移动时施展法术：%namestr%~
 			LPF APPEND_EFFECT_DESC INT_VAR afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%newdesc%~ RET newdesc END
 			READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdiceamonut
@@ -9366,6 +9442,7 @@ END
 				
 DEFINE_PATCH_FUNCTION CHECK_EQUIP_EFFECT
 INT_VAR
+	detailed = 1
 	effectnum = 1
 	pnum = 0
 STR_VAR
@@ -9380,6 +9457,12 @@ BEGIN
 	READ_SHORT (effoffset + 0x30 * (effectnum - 1)) opcode
 	//PATCH_PRINT ~effoffset=%effoffset%~
 	//PATCH_PRINT ~opcode=%opcode%~
+	
+	PATCH_IF detailed = 0 BEGIN	//如果不追求详细描述，有些效果就不处理了
+		PATCH_IF ((opcode == 318)||(opcode == 321)||(opcode == 324)||(opcode == 326)||(opcode == 328)) BEGIN
+			SET opcode = 999
+		END
+	END
 	
 	PATCH_IF opcode == 0 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (effectnum - 1)) readamount
@@ -9962,7 +10045,7 @@ BEGIN
 		PATCH_IF (STRING_LENGTH readres == 0) || (NOT FILE_EXISTS_IN_GAME ~%readres%.cre~) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－解除变形~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
 		END ELSE BEGIN
-			LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR crecode = EVAL ~%readres%~ RET namestr END
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR crecode = EVAL ~%readres%~ RET namestr END
 			PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为%namestr%，获得抗力等数值~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
 			PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－变形为%namestr%，仅外形改变~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
 		END
@@ -10043,22 +10126,25 @@ BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (effectnum - 1)) readamount
 		READ_LONG (8 + effoffset + 0x30 * (effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
-		SPRINT newdesc ~%newdesc%~^~%WNL%－对指定生物类型应用特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%：~
-		PATCH_MATCH readtype
-		WITH
-			2 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
-			3 BEGIN SPRINT newdesc ~%newdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
-			4 BEGIN SPRINT newdesc ~%newdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
-			5 BEGIN SPRINT newdesc ~%newdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
-			6 BEGIN SPRINT newdesc ~%newdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
-			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
-			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
-			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			SPRINT newdesc ~%newdesc%~^~%WNL%－对指定生物类型应用特定效果~
+			LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%：~
+			PATCH_MATCH readtype
+			WITH
+				2 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+				3 BEGIN SPRINT newdesc ~%newdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+				4 BEGIN SPRINT newdesc ~%newdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+				5 BEGIN SPRINT newdesc ~%newdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+				6 BEGIN SPRINT newdesc ~%newdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+				7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+				8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+				9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+				DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+			END
+			SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		END
-		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
 
 	PATCH_IF opcode == 178 BEGIN
@@ -10104,7 +10190,7 @@ BEGIN
 	PATCH_IF opcode == 180 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
 		PATCH_IF (FILE_EXISTS_IN_GAME ~%readres%.itm~) BEGIN
-			LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
 			SPRINT newdesc ~%newdesc%~^~%WNL%－禁止使用物品：%namestr%~ addnum = pnum + 1
 		END
 	END
@@ -10248,8 +10334,8 @@ BEGIN
 	END
 	PATCH_IF opcode == 206 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－防护法术：%namestr%~
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
@@ -10258,8 +10344,8 @@ BEGIN
 
 	PATCH_IF opcode == 207 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%－反弹法术：%namestr%~
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
@@ -10274,8 +10360,7 @@ BEGIN
 	PATCH_IF opcode == 219 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (effectnum - 1)) readamount
 		READ_LONG (8 + effoffset + 0x30 * (effectnum - 1)) readtype
-		READ_LONG (44 + effoffset + 0x30 * (effectnum - 1)) readspecial
-		SPRINT newdesc ~%newdesc%~^~%WNL%－对指定生物类型防御修正%readspecial%：~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
+		SPRINT newdesc ~%newdesc%~^~%WNL%－对指定生物类型获得2点防御和豁免修正%~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
 		PATCH_MATCH readtype
 		WITH
 			2 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
@@ -10346,14 +10431,16 @@ BEGIN
 			3 BEGIN SPRINT newdesc ~%newdesc%~^~时，对最近的对象施法：~ END
 			DEFAULT SPRINT newdesc ~%newdesc%~^~（对象出错）~
 		END
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr = 0) BEGIN SPRINT namestr ~法术文件缺失~ END
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
 		SPRINT newdesc ~%newdesc%~^~%namestr%~
 	END
 	
 	PATCH_IF opcode == 233 BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (effectnum - 1)) readamount
-		READ_LONG (8 + effoffset + 0x30 * (effectnum - 1)) readtype
+		SET readamount1 = readamount / 8	//original class
+		SET readamount = readamount MODULO 8	//active class
+		READ_BYTE (8 + effoffset + 0x30 * (effectnum - 1)) readtype
+		READ_BYTE (10 + effoffset + 0x30 * (effectnum - 1)) readmode
 		PATCH_IF !VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
 			INNER_ACTION BEGIN
 				COPY_EXISTING ~WEAPPROF.2DA~ ~override~
@@ -10373,9 +10460,24 @@ BEGIN
 		END
 		PATCH_IF VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
 			SPRINT temp_string $wprof_namestring(~%readtype%~)
-			SPRINT newdesc ~%newdesc%~^~%WNL%－%temp_string%熟练度设为：%readamount%~
-			LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END
-			SET addnum = pnum + 1
+			PATCH_IF ((readamount1 > 0) && (readmode == 0 || readmode == 1)) BEGIN	//有旧职业
+				PATCH_IF (readmode == 0) BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%－设置旧职业%temp_string%熟练度为%readamount%星，新职业%temp_string%熟练度为%readamount%星~
+				END ELSE BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%－提升旧职业%temp_string%熟练度%readamount%星，新职业%temp_string%熟练度%readamount%星~
+				END
+				LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END
+				SET addnum = pnum + 1				
+			END
+			PATCH_IF ((readamount1 == 0) && (readmode == 0 || readmode == 1)) BEGIN	//无旧职业
+				PATCH_IF (readmode == 0) BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%－设置%temp_string%熟练度为%readamount%星~
+				END ELSE BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%－提升%temp_string%熟练度%readamount%星~
+				END
+				LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END
+				SET addnum = pnum + 1	
+			END
 		END
 	END
 
@@ -10386,17 +10488,21 @@ BEGIN
 	PATCH_IF opcode == 248 BEGIN
 		READ_LONG (8 + effoffset + 0x30 * (effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
-		PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置近战攻击触发特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置徒手攻击触发特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			PATCH_IF (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置近战攻击触发特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			PATCH_IF (readtype == 4) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－设置徒手攻击触发特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+		END
 	END	
 
 	PATCH_IF opcode == 249 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
-		SPRINT newdesc ~%newdesc%~^~%WNL%－设置远程攻击触发特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节			
+			SPRINT newdesc ~%newdesc%~^~%WNL%－设置远程攻击触发特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+		END
 	END	
 	
 	PATCH_IF opcode == 250 BEGIN
@@ -10429,12 +10535,14 @@ BEGIN
 		READ_LONG (4 + effoffset + 0x30 * (effectnum - 1)) readamount
 		READ_LONG (8 + effoffset + 0x30 * (effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
-		PATCH_IF (readtype == 0) && (readamount != 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每秒一次，重复应用特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－应用特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每秒%readamount%次，重复应用特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readtype == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每%readamount%秒一次，重复应用特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			PATCH_IF (readtype == 0) && (readamount != 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每秒一次，重复应用特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			PATCH_IF (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－应用特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			PATCH_IF (readtype == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每秒%readamount%次，重复应用特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			PATCH_IF (readtype == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－每%readamount%秒一次，重复应用特定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+		END
 	END
 
 	PATCH_IF opcode == 275 BEGIN
@@ -10486,22 +10594,24 @@ BEGIN
 		READ_LONG (8 + effoffset + 0x30 * (effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
 		READ_LONG (44 + effoffset + 0x30 * (effectnum - 1)) readspecial
-		SPRINT newdesc ~%newdesc%~^~%WNL%－对指定生物类型应用指定诅咒效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%：~
-		PATCH_MATCH readtype
-		WITH
-			2 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
-			3 BEGIN SPRINT newdesc ~%newdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
-			4 BEGIN SPRINT newdesc ~%newdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
-			5 BEGIN SPRINT newdesc ~%newdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
-			6 BEGIN SPRINT newdesc ~%newdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
-			7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
-			8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
-			9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
-			DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节		
+			SPRINT newdesc ~%newdesc%~^~%WNL%－对指定生物类型应用指定诅咒效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%：~
+			PATCH_MATCH readtype
+			WITH
+				2 BEGIN SPRINT newdesc ~%newdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+				3 BEGIN SPRINT newdesc ~%newdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+				4 BEGIN SPRINT newdesc ~%newdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+				5 BEGIN SPRINT newdesc ~%newdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+				6 BEGIN SPRINT newdesc ~%newdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+				7 BEGIN SPRINT newdesc ~%newdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+				8 BEGIN SPRINT newdesc ~%newdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+				9 BEGIN SPRINT newdesc ~%newdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+				DEFAULT SPRINT newdesc ~%newdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+			END
+			SPRINT newdesc ~%newdesc%~^~%idsentry%~
 		END
-		SPRINT newdesc ~%newdesc%~^~%idsentry%~
 	END
 
 	PATCH_IF opcode == 284 BEGIN
@@ -10646,15 +10756,15 @@ BEGIN
 				END
 			BUT_ONLY
 		END
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed == 1))) BEGIN
 			SPRINT newdesc ~%newdesc%~^~法术效果（%namestr%）~
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
 			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
 			SET addnum = pnum + 1 
 		END
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr > 0) BEGIN SPRINT newdesc ~%newdesc%~^~物品效果（%namestr%）~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed == 1))) BEGIN SPRINT newdesc ~%newdesc%~^~物品效果（%namestr%）~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
 	END	
 	
 	PATCH_IF opcode == 319 BEGIN
@@ -10699,17 +10809,16 @@ BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
 		SPRINT newdesc ~%newdesc%~^~%WNL%－移除特定法术／物品等效果：~
 		PATCH_IF (FILE_EXISTS_IN_GAME ~%readres%.spl~)&&((readtype == 0)||(readtype == 2)) BEGIN
-			LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-			PATCH_IF (STRING_LENGTH namestr > 0) BEGIN
-				SPRINT newdesc ~%newdesc%~^~法术效果（%namestr%）~
-				PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
-				PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
-				SET addnum = pnum + 1
-			END
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+			SPRINT newdesc ~%newdesc%~^~法术效果（%namestr%）~
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
+			SET addnum = pnum + 1
 		END
 		PATCH_IF (FILE_EXISTS_IN_GAME ~%readres%.itm~)&&((readtype == 0)||(readtype == 1)) BEGIN
-			LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
-			PATCH_IF (STRING_LENGTH namestr > 0) BEGIN SPRINT newdesc ~%newdesc%~^~物品效果（%namestr%）~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+			SPRINT newdesc ~%newdesc%~^~物品效果（%namestr%）~
+			SET addnum = pnum + 1
 		END
 	END	
 
@@ -10778,8 +10887,7 @@ BEGIN
 				END
 			BUT_ONLY
 		END
-		LPF SCRAMBLED_TEXT_NAMECHECK STR_VAR splcode = EVAL ~%readres%~ RET namestr END
-		PATCH_IF (STRING_LENGTH namestr == 0) BEGIN SPRINT namestr ~法术文件缺失~ END
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = detailed STR_VAR splcode = EVAL ~%readres%~ RET namestr END
 		SPRINT newdesc ~%newdesc%~^~（%namestr%）~
 		PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT newdesc ~%newdesc%~^~[法师]~ END
 		PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT newdesc ~%newdesc%~^~[牧师]~ END
@@ -10828,23 +10936,27 @@ BEGIN
 
 	PATCH_IF opcode == 340 BEGIN
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
-		SPRINT newdesc ~%newdesc%~^~%WNL%－背刺造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			SPRINT newdesc ~%newdesc%~^~%WNL%－背刺造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+		END
 	END
 
 	PATCH_IF opcode == 341 BEGIN
 		READ_LONG (8 + effoffset + 0x30 * (effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
 		READ_LONG (44 + effoffset + 0x30 * (effectnum - 1)) readspecial
-		PATCH_IF (readspecial == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－致命一击造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readspecial == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－近战致命一击造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readspecial == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－远程致命一击造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readspecial == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－法术致命一击造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%~
-		PATCH_IF (addnum == (pnum + 1)) && (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~（所有持用武器）~ END
-		PATCH_IF (addnum == (pnum + 1)) && (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~（限定此武器）~END
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节		
+			PATCH_IF (readspecial == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－致命一击造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			PATCH_IF (readspecial == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－近战致命一击造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			PATCH_IF (readspecial == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－远程致命一击造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			PATCH_IF (readspecial == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－法术致命一击造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+			PATCH_IF (addnum == (pnum + 1)) && (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~（所有持用武器）~ END
+			PATCH_IF (addnum == (pnum + 1)) && (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~（限定此武器）~END
+		END
 	END
 	
 	PATCH_IF opcode == 344 BEGIN
@@ -10922,14 +11034,16 @@ BEGIN
 		READ_LONG (8 + effoffset + 0x30 * (effectnum - 1)) readtype
 		READ_ASCII (20 + effoffset + 0x30 * (effectnum - 1)) readres
 		READ_LONG (44 + effoffset + 0x30 * (effectnum - 1)) readspecial
-		PATCH_IF (readspecial == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－致命失误造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readspecial == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－近战致命失误造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readspecial == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－远程致命失误造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		PATCH_IF (readspecial == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－法术致命失误造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
-		LPF CHECK_ATTACH_EFFECT INT_VAR viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
-		SPRINT newdesc ~%newdesc%~^~%effectdesc%~
-		PATCH_IF (addnum == (pnum + 1)) && (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~（所有持用武器）~ END
-		PATCH_IF (addnum == (pnum + 1)) && (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~（限定此武器）~ END
+		LPF CHECK_ATTACH_EFFECT INT_VAR effdetailed = detailed viaopcode = opcode STR_VAR effectname = EVAL ~%readres%~ RET effectdesc END
+		PATCH_IF ((~%effectdesc%~ STRING_COMPARE ~{其它效果，如图像文字等}~)||(detailed == 1)) BEGIN	//不是其它效果，或者显示细节
+			PATCH_IF (readspecial == 0) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－致命失误造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			PATCH_IF (readspecial == 1) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－近战致命失误造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			PATCH_IF (readspecial == 2) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－远程致命失误造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			PATCH_IF (readspecial == 3) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－法术致命失误造成指定效果~ LPF EQUIP_TIME_MODE INT_VAR topcode = opcode STR_VAR edesc = EVAL ~%newdesc%~ RET newdesc END SET addnum = pnum + 1 END
+			SPRINT newdesc ~%newdesc%~^~%effectdesc%~
+			PATCH_IF (addnum == (pnum + 1)) && (readtype == 0) BEGIN SPRINT newdesc ~%newdesc%~^~（所有持用武器）~ END
+			PATCH_IF (addnum == (pnum + 1)) && (readtype == 1) BEGIN SPRINT newdesc ~%newdesc%~^~（限定此武器）~ END
+		END
 	END
 
 	PATCH_IF opcode == 362 BEGIN
