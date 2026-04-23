@@ -5,10 +5,10 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 		READ_SHORT 0x1c itemtype
 		READ_LONG 0x54 iddescref
 		READ_STRREF 0x54 iddesc
-		PATCH_IF NOT (iddescref >= 0 && iddescref < 2147483646) BEGIN	//已鉴定描述不在数字范围内，换未鉴定描述
+		PATCH_IF NOT (iddescref > 0 && iddescref < 2147483646) BEGIN	//已鉴定描述不在数字范围内，换未鉴定描述
 			READ_LONG 0x50 iddescref
 			READ_STRREF 0x50 iddesc
-			PATCH_IF NOT (iddescref >= 0 && iddescref < 2147483646) BEGIN	//未鉴定描述也不在数字范围内，新建一个
+			PATCH_IF NOT (iddescref > 0 && iddescref < 2147483646) BEGIN	//未鉴定描述也不在数字范围内，新建一个
 				SPRINT iddesc ~物品原本无描述~
 			END
 		END
@@ -120,10 +120,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						PATCH_IF (itmflag2 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－材质：银~ END
 						PATCH_IF (itmflag2 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－材质：寒铁~ END
 						PATCH_IF abilityproj > 1 BEGIN	//物品的投射编号，在MISSILE.ids里为确切值，在PROJECTL.ids里需要-1
-							LOOKUP_IDS_SYMBOL_OF_INT idsentry ~MISSILE~ abilityproj
-							SPRINT newdesc ~%newdesc%~^~%WNL%－投射动画：%idsentry%~
-							LOOKUP_IDS_SYMBOL_OF_INT idsentry ~PROJECTL~ (abilityproj - 1)
-							SPRINT newdesc ~%newdesc%~^~（%idsentry%）~
+							LPF CHECK_PROJECTL INT_VAR projectlid = (abilityproj - 1) RET oproatt = projectlatt idsentry = projectldesc END
+							SPRINT newdesc ~%newdesc%~^~%WNL%－%idsentry%~
 						END
 						READ_SHORT (20 + abilityoffset + 0x38 * (itmability - 1)) abilitytohit
 						PATCH_IF abilitytohit > 60000 BEGIN SET abilitytohit = (65536 - abilitytohit) END
@@ -178,11 +176,13 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 					COUNT_2DA_ROWS 12 wprof_rows
 					FOR ( wprof_index = 1 ; wprof_index < wprof_rows ; wprof_index = wprof_index + 1 ) BEGIN
 						READ_2DA_ENTRY wprof_index 1 12 wprof_id
-						PATCH_IF wprof_id == abilityprof BEGIN
+						PATCH_IF (wprof_id == abilityprof) && (wprof_id < 116) THEN BEGIN
 							READ_2DA_ENTRY wprof_index 2 12 wprof_name
-							GET_STRREF wprof_name wprof_string
+							PATCH_IF (wprof_name > 0 && wprof_name < 2147483646) THEN BEGIN
+								GET_STRREF wprof_name wprof_string
+								SET wprof_exist = 1
+							END
 							SET wprof_index = wprof_rows
-							SET wprof_exist = 1
 						END
 					END
 				BUT_ONLY
@@ -246,10 +246,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						PATCH_IF (itmflag2 & 0b00000001) = 0b00000001 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－材质：银~ END
 						PATCH_IF (itmflag2 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－材质：寒铁~ END
 						PATCH_IF abilityproj > 1 BEGIN	//物品的投射编号，在MISSILE.ids里为确切值，在PROJECTL.ids里需要-1
-							LOOKUP_IDS_SYMBOL_OF_INT idsentry ~MISSILE~ abilityproj
-							SPRINT newdesc ~%newdesc%~^~%WNL%－投射动画：%idsentry%~
-							LOOKUP_IDS_SYMBOL_OF_INT idsentry ~PROJECTL~ (abilityproj - 1)
-							SPRINT newdesc ~%newdesc%~^~（%idsentry%）~
+							LPF CHECK_PROJECTL INT_VAR projectlid = (abilityproj - 1) RET oproatt = projectlatt idsentry = projectldesc END
+							SPRINT newdesc ~%newdesc%~^~%WNL%－%idsentry%~
 						END
 						READ_SHORT (14 + abilityoffset + 0x38 * (itmability - 1)) abilityrange
 						SPRINT newdesc ~%newdesc%~^~%WNL%－射程：%abilityrange%~
@@ -307,11 +305,13 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 					COUNT_2DA_ROWS 12 wprof_rows
 					FOR ( wprof_index = 1 ; wprof_index < wprof_rows ; wprof_index = wprof_index + 1 ) BEGIN
 						READ_2DA_ENTRY wprof_index 1 12 wprof_id
-						PATCH_IF wprof_id == abilityprof BEGIN
+						PATCH_IF (wprof_id == abilityprof) && (wprof_id < 116) THEN BEGIN
 							READ_2DA_ENTRY wprof_index 2 12 wprof_name
-							GET_STRREF wprof_name wprof_string
+							PATCH_IF (wprof_name > 0 && wprof_name < 2147483646) THEN BEGIN
+								GET_STRREF wprof_name wprof_string
+								SET wprof_exist = 1
+							END
 							SET wprof_index = wprof_rows
-							SET wprof_exist = 1
 						END
 					END
 				BUT_ONLY
@@ -352,10 +352,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						SPRINT newdesc ~%newdesc%~^~%WNL%远程能力（投掷）：~
 						READ_SHORT (14 + abilityoffset + 0x38 * (itmability - 1)) abilityrange
 						PATCH_IF abilityproj > 1 BEGIN	//物品的投射编号，在MISSILE.ids里为确切值，在PROJECTL.ids里需要-1
-							LOOKUP_IDS_SYMBOL_OF_INT idsentry ~MISSILE~ abilityproj
-							SPRINT newdesc ~%newdesc%~^~%WNL%－投射动画：%idsentry%~
-							LOOKUP_IDS_SYMBOL_OF_INT idsentry ~PROJECTL~ (abilityproj - 1)
-							SPRINT newdesc ~%newdesc%~^~（%idsentry%）~
+							LPF CHECK_PROJECTL INT_VAR projectlid = (abilityproj - 1) RET oproatt = projectlatt idsentry = projectldesc END
+							SPRINT newdesc ~%newdesc%~^~%WNL%－%idsentry%~
 						END
 						SPRINT newdesc ~%newdesc%~^~%WNL%－射程：%abilityrange%~
 						READ_SHORT (18 + abilityoffset + 0x38 * (itmability - 1)) abilityspeed
@@ -461,10 +459,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						PATCH_IF abilitytarget == 5 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－目标：自身~ END
 						PATCH_IF abilitytarget == 7 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－目标：自身（无使用间隔）~ END	
 						PATCH_IF abilityproj > 1 BEGIN	//物品的投射编号，在MISSILE.ids里为确切值，在PROJECTL.ids里需要-1
-							LOOKUP_IDS_SYMBOL_OF_INT idsentry ~MISSILE~ abilityproj
-							SPRINT newdesc ~%newdesc%~^~%WNL%－投射动画：%idsentry%~
-							LOOKUP_IDS_SYMBOL_OF_INT idsentry ~PROJECTL~ (abilityproj - 1)
-							SPRINT newdesc ~%newdesc%~^~（%idsentry%）~
+							LPF CHECK_PROJECTL INT_VAR projectlid = (abilityproj - 1) RET oproatt = projectlatt idsentry = projectldesc END
+							SPRINT newdesc ~%newdesc%~^~%WNL%－%idsentry%~
 						END
 						READ_SHORT (14 + abilityoffset + 0x38 * (itmability - 1)) abilityrange
 						SPRINT newdesc ~%newdesc%~^~%WNL%－有效距离：%abilityrange%~

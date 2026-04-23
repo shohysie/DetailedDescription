@@ -182,14 +182,10 @@ COPY_EXISTING ~SPELL.ids~ ~override~
 								READ_SHORT (14 + splabilityoffset) splrange
 								SPRINT newdesc ~%newdesc%~^~，范围：%splrange%~
 								READ_SHORT (38 + splabilityoffset) splpro
-								PATCH_IF splpro > 1 BEGIN	//法术的投射编号，在MISSILE.ids里为确切值，在PROJECTL.ids里需要-1
-									LOOKUP_IDS_SYMBOL_OF_INT idsentry ~MISSILE~ splpro
-									SPRINT newdesc ~%newdesc%~^~%WNL%投射动画：%idsentry%~
-									LOOKUP_IDS_SYMBOL_OF_INT idsentry ~PROJECTL~ (splpro - 1)
-									SPRINT newdesc ~%newdesc%~^~（%idsentry%）~
-								END
+								LPF CHECK_PROJECTL INT_VAR projectlid = (splpro - 1) RET oproatt = projectlatt idsentry = projectldesc END
+								SPRINT newdesc ~%newdesc%~^~%WNL%%idsentry%~
 								READ_SHORT (16 + splabilityoffset) splminlevel
-								SPRINT newdesc ~%newdesc%~^~，需求等级：%splminlevel%~
+								SPRINT newdesc ~%newdesc%~^~%WNL%需求等级：%splminlevel%~
 								READ_SHORT (18 + splabilityoffset) splspeed
 								SPRINT newdesc ~%newdesc%~^~，施法时间：%splspeed%~
 								
@@ -220,14 +216,10 @@ COPY_EXISTING ~SPELL.ids~ ~override~
 								READ_SHORT (14 + splabilityoffset) splrange
 								SPRINT newdesc ~%newdesc%~^~，范围：%splrange%~
 								READ_SHORT (38 + splabilityoffset) splpro
-								PATCH_IF splpro > 1 BEGIN	//法术的投射编号，在MISSILE.ids里为确切值，在PROJECTL.ids里需要-1
-									LOOKUP_IDS_SYMBOL_OF_INT idsentry ~MISSILE~ splpro
-									SPRINT newdesc ~%newdesc%~^~%WNL%－投射动画：%idsentry%~
-									LOOKUP_IDS_SYMBOL_OF_INT idsentry ~PROJECTL~ (splpro - 1)
-									SPRINT newdesc ~%newdesc%~^~（%idsentry%）~
-								END
+								LPF CHECK_PROJECTL INT_VAR projectlid = (splpro - 1) RET oproatt = projectlatt idsentry = projectldesc END
+								SPRINT newdesc ~%newdesc%~^~%WNL%%idsentry%~
 								READ_SHORT (16 + splabilityoffset) splminlevel
-								SPRINT newdesc ~%newdesc%~^~，需求等级：%splminlevel%~
+								SPRINT newdesc ~%newdesc%~^~%WNL%需求等级：%splminlevel%~
 								READ_SHORT (18 + splabilityoffset) splspeed
 								SPRINT newdesc ~%newdesc%~^~，施法时间：%splspeed%~
 
@@ -260,14 +252,10 @@ COPY_EXISTING ~SPELL.ids~ ~override~
 								READ_SHORT (14 + splabilityoffset + 0x28 * (splabilities - 1)) splrange
 								SPRINT newdesc ~%newdesc%~^~，范围：%splrange%~
 								READ_SHORT (38 + splabilityoffset) splpro
-								PATCH_IF splpro > 1 BEGIN	//法术的投射编号，在MISSILE.ids里为确切值，在PROJECTL.ids里需要-1
-									LOOKUP_IDS_SYMBOL_OF_INT idsentry ~MISSILE~ splpro
-									SPRINT newdesc ~%newdesc%~^~%WNL%－投射动画：%idsentry%~
-									LOOKUP_IDS_SYMBOL_OF_INT idsentry ~PROJECTL~ (splpro - 1)
-									SPRINT newdesc ~%newdesc%~^~（%idsentry%）~
-								END
-								READ_SHORT (16 + splabilityoffset + 0x28 * (splabilities - 1)) splminlevel
-								SPRINT newdesc ~%newdesc%~^~，需求等级：%splminlevel%~
+								LPF CHECK_PROJECTL INT_VAR projectlid = (splpro - 1) RET oproatt = projectlatt idsentry = projectldesc END
+								SPRINT newdesc ~%newdesc%~^~%WNL%%idsentry%~
+								READ_SHORT (16 + splabilityoffset) splminlevel
+								SPRINT newdesc ~%newdesc%~^~%WNL%需求等级：%splminlevel%~
 								READ_SHORT (18 + splabilityoffset + 0x28 * (splabilities - 1)) splspeed
 								SPRINT newdesc ~%newdesc%~^~，施法时间：%splspeed%~
 
