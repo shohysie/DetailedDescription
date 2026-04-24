@@ -690,6 +690,7 @@ BEGIN
 							PATCH_IF (proareaflag1 & 0b00010000) == 0b00010000  THEN BEGIN	//激活第二投射
 								PATCH_IF prosecatt > 0 THEN BEGIN	//正常的第二投射物
 									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，从目标发出投射物[%prosecdesc%]~
+									READ_BYTE 0x201 proareaflag2
 									PATCH_IF (proareaflag2 & 0b00001000) == 0b00001000  THEN BEGIN	//锥形
 										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，瞄准施法者方向~
 									END ELSE BEGIN
@@ -703,8 +704,15 @@ BEGIN
 							END
 						END
 					END
-					PATCH_IF ((probehav1 & 0b00000010) == 0b00000010)&&((probehav2 & 0b00010000) != 0b00010000)&&((probehav2 & 0b00100000) != 0b00100000) THEN BEGIN	//穿过目标直线飞行，不能是下落路径或彗星，可能是单体或范围，必然有范围效果
-						PATCH_IF (protype == 2)||((protype == 3)&&((proareaflag2 & 0b00001000) != 0b00001000)) THEN BEGIN	//如果是范围，不能是锥形。如果是单体则OK
+					PATCH_IF ((probehav1 & 0b00000010) == 0b00000010)&&((probehav2 & 0b00010000) != 0b00010000)&&((probehav2 & 0b00100000) != 0b00100000) THEN BEGIN	//穿过目标直线飞行，不能是下落路径或彗星，可能是单体或范围属性，但必然会造成范围效果
+						SET prolinetemp = 0
+						PATCH_IF protype == 3 THEN BEGIN	//如果是范围，检测是否有锥形标志
+							READ_BYTE 0x201 proareaflag2
+							PATCH_IF (proareaflag2 & 0b00001000) != 0b00001000 THEN BEGIN	//不是锥形
+								SET prolinetemp = 1
+							END
+						END
+						PATCH_IF (protype == 2) || (prolinetemp == 1) THEN BEGIN	//如果单体则OK，如果范围不能是锥形
 							PATCH_IF (probehav1 & 0b00001000) != 0b00001000 THEN BEGIN	//非立即命中
 								PATCH_IF prowidth == 0 THEN BEGIN
 									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，直线飞行，影响途经生物~
