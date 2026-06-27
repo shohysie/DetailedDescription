@@ -1,0 +1,3143 @@
+/* **************************************** */
+
+//读取地址与众不同的opcode：
+//12 129 130-133, 137 233 234 319
+//调用 CHECK_ATTACH_EFFECT 解析额外效果的opcode：
+//opcode 177, 283; 183, 248, 249, 272
+//注意：177, 283调用的eff文件不需要读取持续时间，仅调用该eff的效果需要
+
+//给出法术/物品在使用/装备时可能产生的具体效果
+
+DEFINE_PATCH_FUNCTION CHECK_ITM_SPL_EFF_EFFECT
+INT_VAR
+	detailed = 1	//为0不进行详细说明；为1详细说明；为2详细说明但调用SCRAMBLED_TEXT_NAMECHECK时showname=detailed传递极简说明需求；
+					//为3表示被SCRAMBLED_TEXT_NAMECHECK调用，真正进行极简说明，但之后调用SCRAMBLED_TEXT_NAMECHECK只能showname=0
+	location = 0	//0法术效果或物品头部效果 1装备时的效果 2被使用的eff文件
+	viaopcode = 0	//作为eff文件时是被哪个opcode调用，如果是177/283则eff文件不需要读取持续时间
+	firsteff = 0	//从第几个效果开始数。法术和物品的所有效果其实都是平铺，每个0x30。这个参数方便循环读取spl/itm多个头部的各个效果
+	effectnum = 1	//从firsteff数起第几个eff，第一个就是firsteff
+RET
+	effdesc
+BEGIN
+	//如果是对法术或物品进行描述，开头“回车－”；如果是对eff文件进行描述，开头结尾用{}包裹
+	PATCH_IF location != 2 BEGIN
+		SPRINT effdesc ~%WNL%－~
+		READ_LONG 0x6a effoffset	//无论物品文件还是法术文件，效果的起始地址都在这里
+		READ_SHORT (effoffset + 0x30 * (firsteff + effectnum - 1)) opcode
+		READ_LONG (4 + effoffset + 0x30 * (firsteff + effectnum - 1)) readamount
+		READ_LONG (8 + effoffset + 0x30 * (firsteff + effectnum - 1)) readtype
+		READ_ASCII (20 + effoffset + 0x30 * (firsteff + effectnum - 1)) readres
+		READ_LONG (28 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicethrown
+		READ_LONG (32 + effoffset + 0x30 * (firsteff + effectnum - 1)) readdicesides
+		READ_LONG (44 + effoffset + 0x30 * (firsteff + effectnum - 1)) readspecial
+	END ELSE BEGIN
+		SPRINT effdesc ~(%SOURCE_FILE%){~
+		READ_LONG 0x10 opcode
+		READ_LONG 0x1c readamount
+		READ_LONG 0x20 readtype
+		READ_ASCII 0x30 readres
+		READ_LONG 0x38 readdicethrown
+		READ_LONG 0x3c readdicesides
+		READ_LONG 0x48 readspecial
+		READ_LONG 0x60 readpara3
+		READ_LONG 0x64 readpara4
+		READ_LONG 0x68 readpara5
+		READ_ASCII 0x70 readres2
+		READ_ASCII 0x78 readres3
+	END
+
+//PATCH_PRINT ~patch对象: %SOURCE_FILE%，opcode=%opcode%~
+
+	PATCH_IF detailed == 0 BEGIN	//如果不追求详细描述，有些效果就不处理了
+		PATCH_IF ((opcode == 142)||(opcode == 169)||(opcode == 240)||(opcode == 265)||(opcode == 309)||(opcode == 318)||(opcode == 321)||(opcode == 324)||(opcode == 326)||(opcode == 328)) BEGIN
+			SET opcode = 9999
+		END
+	END	
+	PATCH_IF detailed > 2 BEGIN	//最详细描述，图标相关不处理
+		PATCH_IF ((opcode == 142)||(opcode == 169)||(opcode == 240)) BEGIN
+			SET opcode = 9999
+		END
+	END
+	SET descfixed = 0
+
+	PATCH_IF opcode == 0 BEGIN
+		PATCH_IF (readtype == 16) BEGIN SPRINT effdesc ~%effdesc%~^~防御等级设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~挥砍防御修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~穿刺防御修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~远程防御修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~钝击防御修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~防御等级修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 1 BEGIN
+		PATCH_IF readamount > 5 BEGIN
+			SET readamount = (readamount * 2 - 11)
+			PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~每轮攻击次数修正：%readamount%／2~ SET descfixed = 1 END
+			PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~每轮攻击次数设为：%readamount%／2~ SET descfixed = 1 END
+			PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~每轮攻击次数最终设为：%readamount%／2~ SET descfixed = 1 END
+		END ELSE BEGIN
+			PATCH_IF readamount < "-5" BEGIN
+				SET readamount = (readamount * 2 + 11)
+				PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~每轮攻击次数修正：-%readamount%／2~ SET descfixed = 1 END
+			END ELSE BEGIN
+				PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~每轮攻击次数修正：%readamount%~ SET descfixed = 1 END
+				PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~每轮攻击次数设为：%readamount%~ SET descfixed = 1 END
+				PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~每轮攻击次数设为当前的%readamount%％~ SET descfixed = 1 END
+				PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~每轮攻击次数最终设为：%readamount%~ SET descfixed = 1 END
+			END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 2 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除昏迷~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 3 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~I型狂暴~ SET descfixed = 1 END
+		ELSE BEGIN SPRINT effdesc ~%effdesc%~^~战斗中狂暴~ SET descfixed = 1 END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 4 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除I型狂暴~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 5 BEGIN
+		PATCH_IF (readamount == 0) BEGIN SPRINT effdesc ~%effdesc%~^~魅惑生物类型：全部~ SET descfixed = 1 END
+		PATCH_IF (readamount == 1) BEGIN SPRINT effdesc ~%effdesc%~^~魅惑生物类型：人类~ SET descfixed = 1 END
+		PATCH_IF (readamount == 2) BEGIN SPRINT effdesc ~%effdesc%~^~魅惑生物类型：动物~ SET descfixed = 1 END
+		PATCH_IF (readamount == 4) BEGIN SPRINT effdesc ~%effdesc%~^~魅惑生物类型：不死生物~ SET descfixed = 1 END
+		PATCH_IF (readamount == 5) BEGIN SPRINT effdesc ~%effdesc%~^~魅惑生物类型：巨人~ SET descfixed = 1 END
+		PATCH_IF (readamount == 7) BEGIN SPRINT effdesc ~%effdesc%~^~魅惑生物类型：植物~ SET descfixed = 1 END
+		PATCH_IF (readamount == 255) BEGIN SPRINT effdesc ~%effdesc%~^~魅惑生物类型：怪物~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 6 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~魅力修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~魅力设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~魅力设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 10 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~体质修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~体质设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~体质设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 11 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除中毒~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 12 BEGIN
+		SET readtype1 = readtype BAND 0xffff
+		SET readtype2 = readtype BLSR 16
+		SET readspecial1 = readspecial BAND 0xffff
+		SET readspecial2 = readspecial BLSR 16
+		PATCH_IF (readtype2 == 0) BEGIN SPRINT effdesc ~%effdesc%~^~钝击伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 1) BEGIN SPRINT effdesc ~%effdesc%~^~强酸伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 2) BEGIN SPRINT effdesc ~%effdesc%~^~寒冷伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 4) BEGIN SPRINT effdesc ~%effdesc%~^~电击伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 8) BEGIN SPRINT effdesc ~%effdesc%~^~火焰伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 16) BEGIN SPRINT effdesc ~%effdesc%~^~穿刺伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 32) BEGIN SPRINT effdesc ~%effdesc%~^~毒素伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 64) BEGIN SPRINT effdesc ~%effdesc%~^~魔法伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 128) BEGIN SPRINT effdesc ~%effdesc%~^~远程伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 256) BEGIN SPRINT effdesc ~%effdesc%~^~挥砍伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 512) BEGIN SPRINT effdesc ~%effdesc%~^~魔法火焰伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 1024) BEGIN SPRINT effdesc ~%effdesc%~^~魔法寒冷伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype2 == 2048) BEGIN SPRINT effdesc ~%effdesc%~^~瘀伤~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF (readtype1 == 0) BEGIN SPRINT effdesc ~%effdesc%~^~：~ SET descfixed = 2 END
+			PATCH_IF (readtype1 == 1) BEGIN SPRINT effdesc ~%effdesc%~^~（HP设为）：~ SET descfixed = 2 END
+			PATCH_IF (readtype1 == 2) BEGIN SPRINT effdesc ~%effdesc%~^~（HP设为百分比）：~ SET descfixed = 2 END
+			PATCH_IF (readtype1 == 3) BEGIN SPRINT effdesc ~%effdesc%~^~（HP失去百分比）：~ SET descfixed = 2 END
+		END
+		PATCH_IF (descfixed == 2) BEGIN
+			PATCH_IF (readdicethrown != 0) && (readdicesides != 0) BEGIN
+				SPRINT effdesc ~%effdesc%~^~%readdicethrown%D%readdicesides%~
+				PATCH_IF readamount > 0 BEGIN SPRINT effdesc ~%effdesc%~^~＋%readamount%~ END
+				PATCH_IF readamount < 0 BEGIN SPRINT effdesc ~%effdesc%~^~%readamount%~ END
+			END
+			PATCH_IF (readdicethrown == 0)||(readdicesides == 0) BEGIN SPRINT effdesc ~%effdesc%~^~%readamount%~ END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+			PATCH_IF (readspecial1 & 0b00000001) = 0b00000001 BEGIN SPRINT effdesc ~%effdesc%~^~，吸血~ END
+			PATCH_IF (readspecial1 & 0b00000010) = 0b00000010 BEGIN SPRINT effdesc ~%effdesc%~^~，反向吸血~ END
+			PATCH_IF (readspecial1 & 0b00000100) = 0b00000100 BEGIN SPRINT effdesc ~%effdesc%~^~，瘀伤（需使用拳头）~ END
+			PATCH_IF (readspecial1 & 0b00001000) = 0b00001000 BEGIN SPRINT effdesc ~%effdesc%~^~，吸血（不累加）~ END
+			PATCH_IF (readspecial1 & 0b00010000) = 0b00010000 BEGIN SPRINT effdesc ~%effdesc%~^~，反向吸血（不累加）~ END
+			PATCH_IF (readspecial2 & 0b00000001) = 0b00000001 BEGIN SPRINT effdesc ~%effdesc%~^~，通过豁免伤害减半~ END
+			PATCH_IF (readspecial1 & 0b00000010) = 0b00000010 BEGIN SPRINT effdesc ~%effdesc%~^~，未过豁免伤害减半~ END
+			PATCH_IF (readspecial1 & 0b00000100) = 0b00000100 BEGIN SPRINT effdesc ~%effdesc%~^~，不会打醒睡眠生物~ END
+		END ELSE BEGIN
+			SET descfixed = 0	//描述不完全=完全不描述
+		END
+	END
+	PATCH_IF opcode == 13 BEGIN
+		SPRINT effdesc ~%effdesc%~^~即死~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 14 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除冰冻~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 15 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~敏捷修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~敏捷设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~敏捷设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~猫之优雅~ SET descfixed = 1
+			PATCH_IF (location == 2)&&((viaopcode == 177)||(viaopcode == 283)) THEN BEGIN
+				SPRINT effdesc ~%effdesc%~^~敏捷修正：%readamount%~
+			END	
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF (opcode == 16)||(opcode == 317) BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~加速~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~高等加速~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~加速但不加攻击次数~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+			PATCH_IF (opcode == 317) BEGIN SPRINT effdesc ~%effdesc%~^~，武僧可用~ END
+		END
+	END
+
+	PATCH_IF opcode == 17 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~HP修正：~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~HP设为：~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~HP设为当前的百分比：~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF (readdicethrown != 0) && (readdicesides != 0) BEGIN
+				SPRINT effdesc ~%effdesc%~^~%readdicethrown%D%readdicesides%~
+				PATCH_IF readamount > 0 BEGIN SPRINT effdesc ~%effdesc%~^~＋%readamount%~ END
+				PATCH_IF readamount < 0 BEGIN SPRINT effdesc ~%effdesc%~^~%readamount%~ END
+			END
+			PATCH_IF (readdicethrown == 0)||(readdicesides == 0) BEGIN SPRINT effdesc ~%effdesc%~^~%readamount%~ END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 18 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~最大HP修正（当前HP随之变化）：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~最大HP设为（当前HP随之变化）：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~最大HP设为（当前HP随之变化）：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~最大HP修正（当前HP不变）：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~最大HP设为（当前HP不变）：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~最大HP设为（当前HP不变）：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~最大HP修正（当前HP随之变化）：%readamount%（不累加）~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 19 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~智力修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~智力设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~智力设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 20 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~隐形~ SET descfixed = 1 
+			PATCH_IF (location == 2)&&(viaopcode == 183) THEN BEGIN
+				SPRINT effdesc ~%effdesc%~^~且不因为敌对行为而解除~
+			END
+		END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~高等隐形~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~半隐形~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 21 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~学识修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~学识设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~学识设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 22 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~幸运（可累加）修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~幸运（可累加）设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~幸运（可累加）设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 23 BEGIN
+		PATCH_IF (readspecial == 0) BEGIN SPRINT effdesc ~%effdesc%~^~非狂暴状态下，士气设为10~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 1) BEGIN 
+			PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~士气修正：%readamount%~ SET descfixed = 1 END
+			PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~士气设为：%readamount%~ SET descfixed = 1 END
+			PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~士气设为现有的%readamount%％~ SET descfixed = 1 END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			//SPRINT effdesc ~%effdesc%~^~（生物具有“初始士气”“士气崩溃阈值”和“士气恢复间隔”三个数据。队友死亡-2士气[限玩家]，HP每次低于50%和25%时-2士气，每经过“士气恢复间隔”帧恢复1点士气）。当士气低于“士气崩溃阈值”时陷入恐惧或狂暴）~
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 24 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~恐惧~ SET descfixed = 1 END
+		ELSE BEGIN SPRINT effdesc ~%effdesc%~^~恐惧（无视免疫）~ SET descfixed = 1 END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 25 BEGIN
+		PATCH_IF location == 2 THEN BEGIN SET readpara3 = (readpara3 == 0)? 1 : readpara3 END ELSE BEGIN SET readpara3 = 1 END
+		PATCH_IF location == 2 THEN BEGIN SET readpara4 = (readpara4 == 0)? 1 : readpara4 END ELSE BEGIN SET readpara4 = 1 END
+		PATCH_IF (readamount != 0)&&(readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~中毒（每秒1点毒素伤害）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN
+			PATCH_IF (readpara4 != 0) BEGIN
+				SPRINT effdesc ~%effdesc%~^~中毒（每秒1点毒素伤害）~ SET descfixed = 1
+			END ELSE BEGIN
+				PATCH_IF (readamount < 100) BEGIN
+					SPRINT effdesc ~%effdesc%~^~中毒（每秒1点毒素伤害）~ SET descfixed = 1
+				END
+				PATCH_IF (readamount > 99)&&(readamount < 256) BEGIN
+					SPRINT effdesc ~%effdesc%~^~中毒（生物HP>100／%readamount%时每秒1点毒素伤害）~ SET descfixed = 1
+				END
+			END
+		END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~中毒（每%readpara4%秒%readamount%点毒素伤害）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~中毒（每%readpara4%×%readamount%秒1点毒素伤害）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4)&&(location == 2) BEGIN SPRINT effdesc ~%effdesc%~^~中毒（每%readpara4%×%readamount%秒%readpara3%点毒素伤害）~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	
+	PATCH_IF opcode == 26 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除诅咒~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 27 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~强酸抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~强酸抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~强酸抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 28 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~寒冷抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~寒冷抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~寒冷抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 29 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~电击抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~电击抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~电击抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 30 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~火焰抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~火焰抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~火焰抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 31 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~魔法伤害抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~魔法伤害抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~魔法伤害抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 32 BEGIN
+		SPRINT effdesc ~%effdesc%~^~死者复生~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 33 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~对死亡的豁免修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~对死亡的豁免设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~对死亡的豁免设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 34 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~对法杖的豁免修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~对法杖的豁免设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~对法杖的豁免设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 35 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~对变形的豁免修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~对变形的豁免设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~对变形的豁免设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 36 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~对喷吐的豁免修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~对喷吐的豁免设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~对喷吐的豁免设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 37 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~对法术的豁免修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~对法术的豁免设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~对法术的豁免设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 38 BEGIN
+		SPRINT effdesc ~%effdesc%~^~沉默~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 39 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~昏迷（挨打会醒来）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~昏迷（不会被打醒）~ SET descfixed = 1 END
+		PATCH_IF (readspecial > 0)&&(readspecial != 14) THEN BEGIN
+			INNER_ACTION BEGIN
+				COPY_EXISTING ~STATDESC.2DA~ ~override~
+					COUNT_2DA_ROWS 3 maxrows
+					FOR ( index = 1 ; index < maxrows ; index = index + 1 ) BEGIN
+						READ_2DA_ENTRY index 0 3 readiconcode
+						READ_2DA_ENTRY index 1 3 readicondesc
+						PATCH_IF readiconcode == readspecial THEN BEGIN
+							PATCH_IF readicondesc > 0 THEN BEGIN
+								GET_STRREF readicondesc tempdesc
+								SPRINT effdesc ~%effdesc%~^~（显示图标：%tempdesc%）~
+								SET index = maxrows + 1
+							END
+						END
+					END
+				BUT_ONLY
+			END		
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 40 BEGIN
+		SPRINT effdesc ~%effdesc%~^~迟缓~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 42 BEGIN
+		PATCH_IF (readamount == 1) && (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~法师1级法术记忆数量翻倍~ SET descfixed = 1 END
+		PATCH_IF (readamount != 1) && (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~法师%readamount%级及以下法术记忆数量翻倍~ SET descfixed = 1 END
+		PATCH_IF (readamount > 60000) BEGIN SET readamount = (65536 - readamount) END
+		PATCH_IF (readtype & 0b0000000000000001) = 0b0000000000000001 BEGIN SPRINT effdesc ~%effdesc%~^~法师1级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000000000010) = 0b0000000000000010 BEGIN SPRINT effdesc ~%effdesc%~^~法师2级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000000000100) = 0b0000000000000100 BEGIN SPRINT effdesc ~%effdesc%~^~法师3级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000000001000) = 0b0000000000001000 BEGIN SPRINT effdesc ~%effdesc%~^~法师4级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000000010000) = 0b0000000000010000 BEGIN SPRINT effdesc ~%effdesc%~^~法师5级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000000100000) = 0b0000000000100000 BEGIN SPRINT effdesc ~%effdesc%~^~法师6级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000001000000) = 0b0000000001000000 BEGIN SPRINT effdesc ~%effdesc%~^~法师7级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000010000000) = 0b0000000010000000 BEGIN SPRINT effdesc ~%effdesc%~^~法师8级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000100000000) = 0b0000000100000000 BEGIN SPRINT effdesc ~%effdesc%~^~法师9级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000001000000000) = 0b0000001000000000 BEGIN SPRINT effdesc ~%effdesc%~^~法师%readamount%级法术记忆数量翻倍~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 43 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除石化~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 44 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~力量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~力量设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~力量设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~公牛之力~ SET descfixed = 1
+			PATCH_IF (location == 2)&&((viaopcode == 177)||(viaopcode == 283)) THEN BEGIN
+				SPRINT effdesc ~%effdesc%~^~力量修正：%readamount%~
+			END	
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 45 BEGIN
+		SPRINT effdesc ~%effdesc%~^~震慑~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 46 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除震慑~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 47 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除隐形~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 48 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除沉默（发声术）~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 49 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~感知修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~感知设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~感知设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 53 BEGIN
+		LOOKUP_IDS_SYMBOL_OF_INT idsentry ~ANIMATE~ readamount
+		PATCH_IF (readtype == 0)||(readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~改变动画为：%idsentry%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~改变动画为：源生物的原本动画~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 54 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~THAC0修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~THAC0设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~THAC0设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 55 BEGIN
+		SPRINT effdesc ~%effdesc%~^~杀死生物类型：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 56 BEGIN
+		SPRINT effdesc ~%effdesc%~^~阵营反转~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 57 BEGIN
+		SPRINT effdesc ~%effdesc%~^~阵营变化：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			0 BEGIN SPRINT effdesc ~%effdesc%~^~无~ END
+			17 BEGIN SPRINT effdesc ~%effdesc%~^~守序善良~ END
+			18 BEGIN SPRINT effdesc ~%effdesc%~^~守序中立~ END
+			19 BEGIN SPRINT effdesc ~%effdesc%~^~守序邪恶~ END
+			33 BEGIN SPRINT effdesc ~%effdesc%~^~中立善良~ END
+			34 BEGIN SPRINT effdesc ~%effdesc%~^~绝对中立~ END
+			35 BEGIN SPRINT effdesc ~%effdesc%~^~中立邪恶~ END
+			49 BEGIN SPRINT effdesc ~%effdesc%~^~叛逆善良~ END
+			50 BEGIN SPRINT effdesc ~%effdesc%~^~叛逆中立~ END
+			51 BEGIN SPRINT effdesc ~%effdesc%~^~叛逆邪恶~ END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~错误阵营代码~
+		END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 58 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~解除魔法（必然成功）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~解除魔法（以人物等级施展）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~解除魔法（以等级%readamount%施展）~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 59 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~潜行数值修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~潜行数值设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~潜行数值设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 60 BEGIN
+		PATCH_IF (readtype == 0)||(readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~奥术失败率修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1)||(readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~神术失败率修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2)||(readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~特殊能力失败率修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 62 BEGIN
+		PATCH_IF (readamount == 1) && (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~牧师1级法术记忆数量翻倍~ SET descfixed = 1 END
+		PATCH_IF (readamount != 1) && (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~牧师%readamount%级及以下法术记忆数量翻倍~ SET descfixed = 1 END
+		PATCH_IF (readamount > 60000) BEGIN SET readamount = (65536 - readamount) END
+		PATCH_IF (readtype & 0b0000000000000001) = 0b0000000000000001 BEGIN SPRINT effdesc ~%effdesc%~^~牧师1级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000000000010) = 0b0000000000000010 BEGIN SPRINT effdesc ~%effdesc%~^~牧师2级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000000000100) = 0b0000000000000100 BEGIN SPRINT effdesc ~%effdesc%~^~牧师3级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000000001000) = 0b0000000000001000 BEGIN SPRINT effdesc ~%effdesc%~^~牧师4级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000000010000) = 0b0000000000010000 BEGIN SPRINT effdesc ~%effdesc%~^~牧师5级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000000100000) = 0b0000000000100000 BEGIN SPRINT effdesc ~%effdesc%~^~牧师6级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000000001000000) = 0b0000000001000000 BEGIN SPRINT effdesc ~%effdesc%~^~牧师7级法术记忆数量修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype & 0b0000001000000000) = 0b0000001000000000 BEGIN SPRINT effdesc ~%effdesc%~^~牧师%readamount%级法术记忆数量翻倍~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 63 BEGIN
+		SPRINT effdesc ~%effdesc%~^~夜视~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 64 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除夜视~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 65 BEGIN
+		SPRINT effdesc ~%effdesc%~^~朦胧~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	
+	PATCH_IF opcode == 67 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR crecode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的生物~)||(detailed > 0)) BEGIN
+			SPRINT effdesc ~%effdesc%~^~召唤生物：%namestr%~ SET descfixed = 1
+			PATCH_MATCH readtype
+			WITH
+				0 1 3 BEGIN SPRINT effdesc ~%effdesc%~^~（与目标敌友类型一致）~ END
+				2 4 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型由生物本身决定）~ END
+				5 BEGIN SPRINT effdesc ~%effdesc%~^~（与目标敌对）~ END
+				DEFAULT SPRINT effdesc ~%effdesc%~^~（敌友类型由生物本身决定）~
+			END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 68 BEGIN
+		SPRINT effdesc ~%effdesc%~^~反召唤生物~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 69 BEGIN
+		SPRINT effdesc ~%effdesc%~^~无法侦测~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 70 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除无法侦测~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 71 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~性别反转~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN
+			LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount
+			SPRINT effdesc ~%effdesc%~^~性别变成%idsentry%~ SET descfixed = 1
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 72 BEGIN
+		SPRINT effdesc ~%effdesc%~^~设置生物类型为：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			0 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			1 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 73 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~攻击伤害修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~攻击伤害设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~攻击伤害设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 74 BEGIN
+		SPRINT effdesc ~%effdesc%~^~目盲~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 75 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除目盲~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 76 BEGIN
+		SPRINT effdesc ~%effdesc%~^~弱智~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 77 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除弱智~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 78 BEGIN
+		PATCH_IF location == 2 THEN BEGIN SET readpara4 = (readpara4 == 0)? 1 : readpara4 END ELSE BEGIN SET readpara4 = 1 END
+		PATCH_IF (readamount != 0)&&(readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（每秒1点毒素伤害）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN
+			PATCH_IF (readpara4 != 0) BEGIN
+				SPRINT effdesc ~%effdesc%~^~疾病（每秒1点毒素伤害）~ SET descfixed = 1
+			END ELSE BEGIN
+				PATCH_IF (readamount < 100) BEGIN
+					SPRINT effdesc ~%effdesc%~^~疾病（每秒1点毒素伤害）~ SET descfixed = 1
+				END
+				PATCH_IF (readamount > 99)&&(readamount < 256) BEGIN
+					SPRINT effdesc ~%effdesc%~^~疾病（生物HP>100／%readamount%时每秒1点毒素伤害）~ SET descfixed = 1
+				END
+			END
+		END					
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（每%readpara4%秒%readamount%点毒素伤害）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（每%readamount%×%readpara4%秒1点毒素伤害）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（力量减少%readamount%点）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（敏捷减少%readamount%点）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（体质减少%readamount%点）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（智力减少%readamount%点）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（感知减少%readamount%点）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（魅力减少%readamount%点）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（迟缓）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11)||(readtype == 12) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（真菌感染）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 13) BEGIN SPRINT effdesc ~%effdesc%~^~疾病（流感，迟缓且力量、敏捷、魅力均减少%readamount%点）~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 79 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除疾病和弱智~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 80 BEGIN
+		SPRINT effdesc ~%effdesc%~^~耳聋~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 81 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除耳聋~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 83 BEGIN
+		LPF CHECK_PROJECTL INT_VAR projectlid = readtype RET oproatt = projectlatt idsentry = projectldesc END
+		SPRINT effdesc ~%effdesc%~^~防护投射：%idsentry%~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 84 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~魔法火焰伤害抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~魔法火焰伤害抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~魔法火焰伤害抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 85 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~魔法寒冷伤害抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~魔法寒冷伤害抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~魔法寒冷伤害抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 86 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~挥砍伤害抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~挥砍伤害抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~挥砍伤害抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 87 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~钝击伤害抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~钝击伤害抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~钝击伤害抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 88 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~穿刺伤害抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~穿刺伤害抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~穿刺伤害抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 89 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~远程伤害抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~远程伤害抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~远程伤害抗力设为当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 90 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~开锁数值修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~开锁数值设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~开锁数值设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 91 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~找寻陷阱数值修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~找寻陷阱数值设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~找寻陷阱数值设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 92 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~扒窃数值修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~扒窃数值设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~扒窃数值设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 93 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~疲劳数值修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~疲劳数值设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~疲劳数值设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 94 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~醉酒数值修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~醉酒数值设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~醉酒数值设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 96 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~等级修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~等级设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~等级设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 97 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~力量18时尾数修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~力量18时尾数设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~力量18时尾数设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 98 BEGIN
+		PATCH_IF location == 2 THEN BEGIN SET readpara4 = (readpara4 == 0)? 1 : readpara4 END ELSE BEGIN SET readpara4 = 1 END
+		PATCH_IF (readamount != 0)&&(readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~每秒再生1HP~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN
+			PATCH_IF (readpara4 != 0) BEGIN
+				SPRINT effdesc ~%effdesc%~^~每秒再生1HP~ SET descfixed = 1
+			END ELSE BEGIN
+				PATCH_IF (readamount < 100) BEGIN
+					SPRINT effdesc ~%effdesc%~^~每秒再生1HP~ SET descfixed = 1
+				END
+				PATCH_IF (readamount > 99)&&(readamount < 256) BEGIN
+					SPRINT effdesc ~%effdesc%~^~生物HP>100／%readamount%时每秒再生1HP~ SET descfixed = 1
+				END
+			END
+		END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~每%readpara4%秒再生%readamount%HP~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~每%readamount%×%readpara4%秒再生1HP~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4)&&(location == 2) BEGIN SPRINT effdesc ~%effdesc%~^~每%readamount%×%readpara4%秒再生%readpara3%HP~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 99 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~奥术持续时间设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~神术持续时间设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~战歌持续时间设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 100 BEGIN
+		SPRINT effdesc ~%effdesc%~^~防护生物类型：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 101 BEGIN
+		SPRINT effdesc ~%effdesc%~^~防护效果条目：~ SET descfixed = 1
+		INNER_ACTION BEGIN
+			COPY ~DetailedDescription\2da\dopcodes.2da~ ~override~
+				COUNT_2DA_ROWS 2 maxrows
+				FOR ( index = 0 ; index < maxrows ; index = index + 1 ) BEGIN
+					READ_2DA_ENTRY index 0 2 readopcode
+					READ_2DA_ENTRY index 1 2 readopcodename
+					PATCH_IF readopcode == readtype BEGIN
+						SPRINT effdesc ~%effdesc%~^~%readopcodename%~
+						SET index = maxrows + 1
+					END
+				END
+				PATCH_IF index < maxrows BEGIN
+					SPRINT effdesc ~%effdesc%~^~效果编号超出范围（#%readtype%）~
+				END
+			BUT_ONLY
+		END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 102 BEGIN
+		SPRINT effdesc ~%effdesc%~^~免疫%readamount%级法术~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 104 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~经验值修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~经验值设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~经验值设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 105 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~金币数减少：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~金币数设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~金币数设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 106 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~士气崩溃阈值修正：%readamount%（越低越容易崩溃）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN
+			PATCH_IF (readamount < 2) BEGIN SPRINT effdesc ~%effdesc%~^~防止士气崩溃~ SET descfixed = 1 END
+			ELSE BEGIN SPRINT effdesc ~%effdesc%~^~士气崩溃阈值设为%readamount%（越低越容易崩溃）~ SET descfixed = 1 END
+		END			PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~士气崩溃阈值设为现有的%readamount%％（越低越容易崩溃）~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			//SPRINT effdesc ~%effdesc%~^~（生物具有“初始士气”“士气崩溃阈值”和“士气恢复间隔”三个数据。队友死亡-2士气[限玩家]，HP每次低于50%和25%时-2士气，每经过“士气恢复间隔”帧恢复1点士气）。当士气低于“士气崩溃阈值”时陷入恐惧或狂暴）~
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 109 BEGIN
+		SPRINT effdesc ~%effdesc%~^~麻痹生物类型：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 111 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN
+			SPRINT effdesc ~%effdesc%~^~产生魔法武器：%namestr%，数量%readamount%~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 112 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN
+			SPRINT effdesc ~%effdesc%~^~移除物品：%namestr%~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 114 BEGIN
+		SPRINT effdesc ~%effdesc%~^~可识别（生物在已探索但无视野的半迷雾区域可进行互动）~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 115 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~侦测邪恶（发红光）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~侦测中立（发蓝光）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~侦测善良（发绿光）~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 116 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除隐形~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF (opcode == 119)||(opcode == 159) BEGIN
+		PATCH_IF (opcode == 119) BEGIN SPRINT effdesc ~%effdesc%~^~产生镜影~ SET descfixed = 1 END
+		ELSE BEGIN SPRINT effdesc ~%effdesc%~^~产生%readamount%个镜影~ SET descfixed = 1 END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 120 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~免疫附魔等级%readamount%的武器~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~免疫魔法武器~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~免疫非魔法武器~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~免疫银质武器~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~免疫非银质武器~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~免疫非银质或非魔法武器~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~免疫寒铁武器~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11) BEGIN SPRINT effdesc ~%effdesc%~^~免疫非寒铁武器~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 122 BEGIN
+		PATCH_IF location != 2 THEN BEGIN
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+			PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN
+				SPRINT effdesc ~%effdesc%~^~创建物品栏物品：%namestr%，数量%readamount%~ SET descfixed = 1
+				LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+			END
+		END ELSE BEGIN
+				LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr0 = namestr END
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres2%~ RET namestr1 = namestr END
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres3%~ RET namestr2 = namestr END
+			PATCH_IF ((~%namestr0%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr0%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN SET descfixed = 1 END
+			PATCH_IF ((~%namestr1%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr1%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN SET descfixed = 2 END
+			PATCH_IF ((~%namestr2%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr2%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN SET descfixed = 3 END
+			PATCH_IF (descfixed == 1) BEGIN
+				SPRINT effdesc ~%effdesc%~^~创建物品栏物品：%namestr0%，数量%readamount%~
+				PATCH_IF (readpara3 > 0)||(readpara4 > 0) BEGIN SPRINT effdesc ~%effdesc%~^~／%readpara3%~ END
+				PATCH_IF readpara4 > 0 BEGIN SPRINT effdesc ~%effdesc%~^~／%readpara4%~ END
+				LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+			END
+			PATCH_IF (descfixed == 2) BEGIN
+				SPRINT effdesc ~%effdesc%~^~创建物品栏物品：%namestr0%／%namestr1%，数量%readamount%~
+				PATCH_IF (readpara3 > 0)||(readpara4 > 0) BEGIN SPRINT effdesc ~%effdesc%~^~／%readpara3%~ END
+				PATCH_IF readpara4 > 0 BEGIN SPRINT effdesc ~%effdesc%~^~／%readpara4%~ END
+				LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+			END
+			PATCH_IF (descfixed == 3) BEGIN
+				PATCH_IF (FILE_EXISTS_IN_GAME ~%readres2%.itm~) BEGIN
+					SPRINT effdesc ~%effdesc%~^~创建物品栏物品：%namestr0%／%namestr1%／%namestr2%，数量%readamount%~
+				END ELSE BEGIN
+					SPRINT effdesc ~%effdesc%~^~创建物品栏物品：%namestr0%／%namestr2%，数量%readamount%~
+				END
+				PATCH_IF (readpara3 > 0)||(readpara4 > 0) BEGIN SPRINT effdesc ~%effdesc%~^~／%readpara3%~ END
+				PATCH_IF readpara4 > 0 BEGIN SPRINT effdesc ~%effdesc%~^~／%readpara4%~ END
+				LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+			END
+		END
+	END
+	PATCH_IF opcode == 123 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN
+			SPRINT effdesc ~%effdesc%~^~移除物品栏物品：%namestr%~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 124 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~传送~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~将源传送到目标~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~传送回已记忆地点~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~交换源和目标~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 125 BEGIN
+		SPRINT effdesc ~%effdesc%~^~敲击开锁~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 126 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~移动速率修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~移动速率设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~移动速率设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~移动速率设为：当前的%readamount%％（可累加）~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 127 BEGIN
+		SPRINT effdesc ~%effdesc%~^~召唤指定生物~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 128 BEGIN
+		SPRINT effdesc ~%effdesc%~^~困惑~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 129 BEGIN
+		SET readspecial = readamount BAND 0xff	//命中伤害豁免修正仅看第一字节
+		PATCH_IF (readamount > 0) BEGIN
+			PATCH_IF location != 2 THEN BEGIN
+				SPRINT effdesc ~%effdesc%~^~援助：命中、伤害、豁免+%readspecial%有利，最大HP增加%readamount%D8~ SET descfixed = 1
+			END ELSE BEGIN
+				SPRINT effdesc ~%effdesc%~^~援助：命中、伤害、豁免+%readspecial%有利，最大HP增加%readtype%~ SET descfixed = 1
+			END
+		END
+		PATCH_IF (readamount < 0) BEGIN SPRINT effdesc ~%effdesc%~^~反向援助：命中、伤害、豁免%readamount%不利~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 130 BEGIN
+		SET readamount = readamount BAND 0xff
+		SPRINT effdesc ~%effdesc%~^~祝福（命中伤害获得%readamount%修正，士气+5）~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 131 BEGIN
+		SET readamount = readamount BAND 0xff
+		SPRINT effdesc ~%effdesc%~^~幸运值设置（正面祈祷，不累加）：%readamount%~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 132 BEGIN
+		SET readamount = readamount BAND 0xff
+		SPRINT effdesc ~%effdesc%~^~力量敏捷体质修正%readamount%点，不累加~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 133 BEGIN
+		SET readamount = readamount BAND 0xff
+		SPRINT effdesc ~%effdesc%~^~幸运值设置（不累加）：%readamount%~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 134 BEGIN
+		SPRINT effdesc ~%effdesc%~^~石化~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 135 BEGIN
+		PATCH_IF (STRING_LENGTH ~%readres%~ == 0) BEGIN
+			PATCH_IF (readtype == "-1") BEGIN SPRINT effdesc ~%effdesc%~^~解除所有变形~ SET descfixed = 1 END
+			PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~解除数值和外形均改变的变形~ SET descfixed = 1 END
+			PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~解除仅外形改变的变形~ SET descfixed = 1 END
+		END ELSE BEGIN
+			PATCH_IF FILE_EXISTS_IN_GAME ~%readres%.cre~ BEGIN
+				LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR crecode = EVAL ~%readres%~ RET namestr END
+				PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~变形为：%namestr%（数值和外形均改变）~ SET descfixed = 1 END
+				PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~变形为：%namestr%（仅外形改变）~ SET descfixed = 1 END
+			END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF location == 2 THEN BEGIN
+				PATCH_IF readpara3 > 0 THEN BEGIN SPRINT effdesc ~%effdesc%~^~，动画圆圈半径：%readpara3%~ END
+				PATCH_IF readpara4 > 0 THEN BEGIN
+					LOOKUP_IDS_SYMBOL_OF_INT idsentry ~ANIMATE~ readpara4
+					SPRINT effdesc ~%effdesc%~^~，动画设为：%idsentry%~
+				END
+			END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 136 BEGIN
+		SPRINT effdesc ~%effdesc%~^~强制可见~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 137 BEGIN
+		SET readamount = readamount BAND 0xff
+		SPRINT effdesc ~%effdesc%~^~幸运值设置（负面祈祷，不累加）：%readamount%~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 138 BEGIN
+		SPRINT effdesc ~%effdesc%~^~演示动作：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			0 BEGIN SPRINT effdesc ~%effdesc%~^~攻击~ END
+			1 BEGIN SPRINT effdesc ~%effdesc%~^~苏醒~ END
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~施法~ END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~召唤~ END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~受伤~ END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~死亡~ END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~超度~ END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~准备~ END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~射击~ END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~抽搐~ END
+			10 BEGIN SPRINT effdesc ~%effdesc%~^~行走~ END
+			11 BEGIN SPRINT effdesc ~%effdesc%~^~攻击（竖劈）~ END
+			12 BEGIN SPRINT effdesc ~%effdesc%~^~攻击（横扫）~ END
+			13 BEGIN SPRINT effdesc ~%effdesc%~^~攻击（直刺）~ END
+			14 BEGIN SPRINT effdesc ~%effdesc%~^~显形~ END
+			15 BEGIN SPRINT effdesc ~%effdesc%~^~隐藏~ END
+			16 BEGIN SPRINT effdesc ~%effdesc%~^~昏睡~ END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~错误的动作代码~
+		END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 142 BEGIN
+		INNER_ACTION BEGIN
+			COPY_EXISTING ~STATDESC.2DA~ ~override~
+				COUNT_2DA_ROWS 3 maxrows
+				FOR ( index = 1 ; index < maxrows ; index = index + 1 ) BEGIN
+					READ_2DA_ENTRY index 0 3 readiconcode
+					READ_2DA_ENTRY index 1 3 readicondesc
+					PATCH_IF readiconcode == readtype THEN BEGIN
+						PATCH_IF readicondesc > 0 THEN BEGIN
+							GET_STRREF readicondesc tempdesc
+							SPRINT effdesc ~%effdesc%~^~显示图标：%tempdesc%~ SET descfixed = 1
+							SET index = maxrows + 1
+						END
+					END
+				END
+			BUT_ONLY
+		END
+		PATCH_IF descfixed == 1 THEN BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 143 BEGIN
+		LOOKUP_IDS_SYMBOL_OF_INT idsentry ~SLOTS~ readamount
+		PATCH_IF (readamount == 15) BEGIN SPRINT idsentry ~SLOT_MISC0（QUICK0）~ END
+		PATCH_IF (readamount == 16) BEGIN SPRINT idsentry ~SLOT_MISC1（QUICK1）~ END
+		PATCH_IF (readamount == 17) BEGIN SPRINT idsentry ~SLOT_MISC2（QUICK2）~ END
+		PATCH_IF (readamount == 34) BEGIN SPRINT idsentry ~SLOT_MISC19（Magical_Weapon）~ END
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN
+			SPRINT effdesc ~%effdesc%~^~在%idsentry%栏创建物品：%namestr%~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 144 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~禁止潜行按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~禁止盗贼能力按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~禁止法术选择按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~禁止快捷法术I按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~禁止快捷法术II按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~禁止快捷法术III按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~禁止超度按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~禁止对话按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~禁止使用物品能力按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~禁止快捷物品I按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~禁止诗人演奏按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11) BEGIN SPRINT effdesc ~%effdesc%~^~禁止快捷物品II按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 12) BEGIN SPRINT effdesc ~%effdesc%~^~禁止快捷物品III按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 13) BEGIN SPRINT effdesc ~%effdesc%~^~禁止施展特殊能力按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 14) BEGIN SPRINT effdesc ~%effdesc%~^~禁止寻找陷阱按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 15) BEGIN SPRINT effdesc ~%effdesc%~^~禁止物品栏按钮~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 145 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~禁止法师施法~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~禁止牧师施法~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~禁止施展法术以外的技能~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~禁止施展法术和类法术能力~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 146 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed > 0))) BEGIN
+			PATCH_IF (readamount == 0)&&(readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~以人物等级施法：%namestr%~ SET descfixed = 1 END
+			PATCH_IF (readamount != 0)&&(readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~以等级%readamount%施法：%namestr%~ SET descfixed = 1 END
+			PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~以人物等级瞬间施法：%namestr%~ SET descfixed = 1 END
+			PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~以等级%readamount%瞬间施法：%namestr%~ SET descfixed = 1 END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effdesc ~%effdesc%~^~[法师]~ END
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effdesc ~%effdesc%~^~[牧师]~ END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 147 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed > 0))) BEGIN
+			SPRINT effdesc ~%effdesc%~^~学习法术：%namestr%~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 148 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed > 0))) BEGIN
+			PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~以等级%readamount%向目的地施法：%namestr%~ SET descfixed = 1 END
+			PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~瞬间向目的地施法：%namestr%~ SET descfixed = 1 END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effdesc ~%effdesc%~^~[法师]~ END
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effdesc ~%effdesc%~^~[牧师]~ END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 150 BEGIN
+		SPRINT effdesc ~%effdesc%~^~显示陷阱~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 151 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~移除并替换生物~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1)||(readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~杀死并替换生物~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 153 BEGIN
+		SPRINT effdesc ~%effdesc%~^~圣域~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 154 BEGIN
+		SPRINT effdesc ~%effdesc%~^~纠缠~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 157 BEGIN
+		SPRINT effdesc ~%effdesc%~^~蛛网~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 158 BEGIN
+		SPRINT effdesc ~%effdesc%~^~油腻~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 160 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除圣域~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 161 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除恐惧~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 162 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除定身~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 163 BEGIN
+		SPRINT effdesc ~%effdesc%~^~自由行动（解除被设为较低值的移动速率修正I）~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 164 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除醉酒~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 165 BEGIN
+		SPRINT effdesc ~%effdesc%~^~暂停目标~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 166 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~魔法抗力修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~魔法抗力设为：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 167 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~远程THAC0修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~远程THAC0设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~远程THAC0设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 168 BEGIN
+		SPRINT effdesc ~%effdesc%~^~移除生物~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 169 BEGIN
+		INNER_ACTION BEGIN
+			COPY_EXISTING ~STATDESC.2DA~ ~override~
+				COUNT_2DA_ROWS 3 maxrows
+				FOR ( index = 1 ; index < maxrows ; index = index + 1 ) BEGIN
+					READ_2DA_ENTRY index 0 3 readiconcode
+					READ_2DA_ENTRY index 1 3 readicondesc
+					PATCH_IF readiconcode == readtype THEN BEGIN
+						PATCH_IF readicondesc > 0 THEN BEGIN
+							GET_STRREF readicondesc tempdesc
+							SPRINT effdesc ~%effdesc%~^~防止显示图标：%tempdesc%~ SET descfixed = 1
+							SET index = maxrows + 1
+						END
+					END
+				END
+			BUT_ONLY
+		END
+		PATCH_IF descfixed == 1 THEN BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 171 BEGIN
+		PATCH_IF (location == 0)&&(NOT ~%SOURCE_FILE%~ STRING_COMPARE_CASE ~%readres%.spl~) THEN BEGIN	//目标法术是当前法术本身
+			SPRINT effdesc ~%effdesc%~^~获得能力或法术：当前法术本身~ SET descfixed = 1
+		END ELSE BEGIN
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+			PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed > 0))) BEGIN
+				SPRINT effdesc ~%effdesc%~^~获得能力或法术：%namestr%~ SET descfixed = 1
+			END
+		END
+		PATCH_IF descfixed == 1 THEN BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 172 BEGIN
+		PATCH_IF (location == 0)&&(NOT ~%SOURCE_FILE%~ STRING_COMPARE_CASE ~%readres%.spl~) THEN BEGIN	//目标法术是当前法术本身
+			SPRINT effdesc ~%effdesc%~^~失去能力或法术：当前法术本身~ SET descfixed = 1
+		END ELSE BEGIN
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+			PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed > 0))) BEGIN
+				SPRINT effdesc ~%effdesc%~^~失去能力或法术：%namestr%~ SET descfixed = 1
+			END
+		END
+		PATCH_IF descfixed == 1 THEN BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 173 BEGIN
+		SPRINT effdesc ~%effdesc%~^~毒素抗力修正：%readamount%％~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 175 BEGIN
+		SPRINT effdesc ~%effdesc%~^~I型定身生物类型：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 176 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~移动速率修正（无视自由行动）：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~移动速率设为（无视自由行动）：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~移动速率设为（无视自由行动）：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~移动速率设为（无视自由行动）：当前的%readamount%％（可累加）~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 177 BEGIN
+		SPRINT tempdesc ~%effdesc%~^~对指定生物类型应用特定效果~	//暂存一下
+		PATCH_IF location == 2 THEN BEGIN
+			PATCH_IF readpara5 > 0 THEN BEGIN
+				SPRINT tempdesc ~%effdesc%~^~，无视免疫和豁免~
+			END
+		END
+		INNER_ACTION BEGIN
+			ACTION_IF FILE_EXISTS_IN_GAME ~%readres%.eff~ THEN BEGIN
+				COPY_EXISTING ~%readres%.eff~ ~override~
+				LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed location = 2 viaopcode = opcode RET effdesc END
+				PATCH_IF STRING_LENGTH ~%effdesc%~ > 0 THEN BEGIN
+					SPRINT effdesc ~%tempdesc%~^~%effdesc%：~
+					SET descfixed = 1
+				END
+			END
+		END
+		PATCH_IF descfixed == 1 THEN BEGIN
+			PATCH_MATCH readtype
+			WITH
+				2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+				3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+				4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+				5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+				6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+				7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+				8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+				9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+				DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+			END
+			SPRINT effdesc ~%effdesc%~^~%idsentry%~
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 178 BEGIN
+		SPRINT effdesc ~%effdesc%~^~对特定生物类型：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		PATCH_IF location != 2 THEN BEGIN
+			SPRINT effdesc ~%effdesc%~^~命中修正：%readspecial%~
+		END ELSE BEGIN
+			SPRINT effdesc ~%effdesc%~^~命中修正：%readpara3%~
+		END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 179 BEGIN
+		SPRINT effdesc ~%effdesc%~^~对特定生物类型：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		PATCH_IF location != 2 THEN BEGIN
+			SPRINT effdesc ~%effdesc%~^~伤害修正：%readspecial%~
+		END ELSE BEGIN
+			SPRINT effdesc ~%effdesc%~^~伤害修正：%readpara3%~
+		END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 180 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN
+			SPRINT effdesc ~%effdesc%~^~禁止使用物品：%namestr%~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 181 BEGIN
+		LOOKUP_IDS_SYMBOL_OF_INT idsentry ~ITEMCAT~ readamount
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~禁止装备物品类型：%idsentry%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~禁止使用物品类型：%idsentry%~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	
+	PATCH_IF opcode == 182 BEGIN
+		PATCH_IF location == 2 && STRING_LENGTH ~%readres%~ > 0 BEGIN	//作为eff文件被调用且物品名称正常
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+			PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN			
+				SPRINT tempdesc ~%effdesc%~^~装备%namestr%则应用指定效果~	//暂存一下
+				INNER_ACTION BEGIN
+					ACTION_IF FILE_EXISTS_IN_GAME ~%readres2%.eff~ THEN BEGIN
+						COPY_EXISTING ~%readres2%.eff~ ~override~
+						LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed location = 2 viaopcode = opcode RET effdesc END
+						PATCH_IF STRING_LENGTH ~%effdesc%~ > 0 THEN BEGIN
+							SPRINT effdesc ~%tempdesc%~^~[%effdesc%]~
+							SET descfixed = 1
+						END
+					END
+				END
+			END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	
+	PATCH_IF opcode == 183 BEGIN
+		SPRINT tempdesc ~%effdesc%~^~装备物品类型则应用指定效果~	//暂存一下
+		INNER_ACTION BEGIN
+			ACTION_IF FILE_EXISTS_IN_GAME ~%readres%.eff~ THEN BEGIN
+				COPY_EXISTING ~%readres%.eff~ ~override~
+				LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed location = 2 viaopcode = opcode RET effdesc END
+				PATCH_IF STRING_LENGTH ~%effdesc%~ > 0 THEN BEGIN
+					SPRINT effdesc ~%tempdesc%~^~%effdesc%~
+					SET descfixed = 1
+				END
+			END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 184 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~穿墙（无法停留在不可通行区域）~ SET descfixed = 1 END
+		ELSE BEGIN SPRINT effdesc ~%effdesc%~^~穿墙（允许停留在不可通行区域）~ SET descfixed = 1 END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 185 BEGIN
+		SPRINT effdesc ~%effdesc%~^~II型定身生物类型：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 188 BEGIN
+		SPRINT effdesc ~%effdesc%~^~施法无需间隔~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 189 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~施法速度修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~施法时间设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~施法时间设为不超过：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 190 BEGIN
+		SPRINT effdesc ~%effdesc%~^~武器出手速度修正：%readamount%~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 191 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~奥术施法等级修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~神术施法等级修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 193 BEGIN
+		SPRINT effdesc ~%effdesc%~^~在脚本中允许攻击隐形生物~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 197 BEGIN
+		LPF CHECK_PROJECTL INT_VAR projectlid = readtype RET oproatt = projectlatt idsentry = projectldesc END
+		SPRINT effdesc ~%effdesc%~^~反弹投射：%idsentry%~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 198 BEGIN
+		SPRINT effdesc ~%effdesc%~^~反弹效果条目：~ SET descfixed = 1
+		INNER_ACTION BEGIN
+			COPY ~DetailedDescription\2da\dopcodes.2da~ ~override~
+				COUNT_2DA_ROWS 2 maxrows
+				FOR ( index = 0 ; index < maxrows ; index = index + 1 ) BEGIN
+					READ_2DA_ENTRY index 0 2 readopcode
+					READ_2DA_ENTRY index 1 2 readopcodename
+					PATCH_IF readopcode == readtype BEGIN
+						SPRINT effdesc ~%effdesc%~^~%readopcodename%~
+						SET index = maxrows + 1
+					END
+				END
+				PATCH_IF index < maxrows BEGIN
+					SPRINT effdesc ~%effdesc%~^~超出范围的效果编号（#%readtype%）~
+				END
+			BUT_ONLY
+		END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 199 BEGIN
+		SPRINT effdesc ~%effdesc%~^~反弹%readamount%级法术~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 200 BEGIN
+		SPRINT effdesc ~%effdesc%~^~反弹%readtype%级法术，共反弹%readamount%次~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 201 BEGIN
+		SPRINT effdesc ~%effdesc%~^~吸收%readtype%级法术，共吸收%readamount%次~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 202 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：防护系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：咒法系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：预言系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：附魔系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：幻术系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：塑能系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：死灵系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：改变系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：全部~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 203 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：法术防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：特殊防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：幻术防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：破魔~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：破幻~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：咒法~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：战斗防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：意外~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：战场~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：攻击伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：失能~ SET descfixed = 1 END
+		PATCH_IF (readtype == 12) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：综合~ SET descfixed = 1 END
+		PATCH_IF (readtype == 13) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：非战斗~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+		PATCH_IF opcode == 204 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：防护系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：咒法系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：预言系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：附魔系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：幻术系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：塑能系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：死灵系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：改变系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：全部~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 205 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：法术防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：特殊防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：幻术防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：破魔~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：破幻~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：咒法~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：战斗防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：意外~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：战场~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：攻击伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：失能~ SET descfixed = 1 END
+		PATCH_IF (readtype == 12) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：综合~ SET descfixed = 1 END
+		PATCH_IF (readtype == 13) BEGIN SPRINT effdesc ~%effdesc%~^~防护第二类型：非战斗~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	
+	PATCH_IF opcode == 206 BEGIN
+		PATCH_IF (location == 0)&&(NOT ~%SOURCE_FILE%~ STRING_COMPARE_CASE ~%readres%.spl~) THEN BEGIN	//目标法术是当前法术本身
+			SPRINT effdesc ~%effdesc%~^~防护法术：当前法术本身~ SET descfixed = 1
+		END ELSE BEGIN
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+			PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed > 0))) BEGIN
+				SPRINT effdesc ~%effdesc%~^~防护法术：%namestr%~ SET descfixed = 1
+				PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effdesc ~%effdesc%~^~[法师]~ END
+				PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effdesc ~%effdesc%~^~[牧师]~ END
+			END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 207 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed > 0))) BEGIN
+			SPRINT effdesc ~%effdesc%~^~反弹法术：%namestr%~ SET descfixed = 1
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effdesc ~%effdesc%~^~[法师]~ END
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effdesc ~%effdesc%~^~[牧师]~ END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 208 BEGIN
+		SPRINT effdesc ~%effdesc%~^~最小HP限制：%readamount%~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 209 BEGIN
+		SPRINT effdesc ~%effdesc%~^~杀死60HP以下生物~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 210 BEGIN
+		SPRINT effdesc ~%effdesc%~^~震慑90HP以下生物~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 211 BEGIN
+		SPRINT effdesc ~%effdesc%~^~禁锢~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 212 BEGIN
+		SPRINT effdesc ~%effdesc%~^~自由~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 213 BEGIN
+		SPRINT effdesc ~%effdesc%~^~迷宫~ SET descfixed = 1
+		PATCH_IF (readamount == 0) BEGIN SPRINT effdesc ~%effdesc%~^~（对象智力决定持续时间）~ END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 214 BEGIN
+		SPRINT effdesc ~%effdesc%~^~选择法术列表~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 216 BEGIN
+		SPRINT effdesc ~%effdesc%~^~吸取%readamount%个等级~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 217 BEGIN
+		SPRINT effdesc ~%effdesc%~^~昏迷20HP以下生物~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 218 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~%readamount%层石肤~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1)&&(readamount != 0)&&((readdicethrown == 0)||(readdicesides == 0)) BEGIN SPRINT effdesc ~%effdesc%~^~%readamount%层石肤~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1)&&(readamount == 0)&&(readdicethrown != 0)&&(readdicesides != 0) BEGIN SPRINT effdesc ~%effdesc%~^~%readdicethrown%D%readdicesides%层石肤~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1)&&(readamount != 0)&&(readdicethrown != 0)&&(readdicesides != 0) BEGIN SPRINT effdesc ~%effdesc%~^~%readamount%＋%readdicethrown%D%readdicesides%层石肤~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 219 BEGIN
+		SPRINT effdesc ~%effdesc%~^~对特定生物类型：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		SPRINT effdesc ~%effdesc%~^~获得2点防御和豁免修正~
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 220 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：防护系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：咒法系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：预言系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：附魔系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：幻术系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：塑能系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：死灵系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：改变系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：全部~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 221 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：法术防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：特殊防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：幻术防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：破魔~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：破幻~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：咒法~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：战斗防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：意外~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：战场~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：攻击伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：失能~ SET descfixed = 1 END
+		PATCH_IF (readtype == 12) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：综合~ SET descfixed = 1 END
+		PATCH_IF (readtype == 13) BEGIN SPRINT effdesc ~%effdesc%~^~移除第二类型：非战斗~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 222 BEGIN
+		SPRINT effdesc ~%effdesc%~^~传送域（最大范围%readamount%呎）~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 223 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：吸收系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：咒法系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：预言系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：附魔系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：幻术系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：塑能系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：死灵系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：改变系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：全部~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，总共吸收%readamount%次~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 224 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除等级吸取~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 226 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：法术防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：特殊防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：幻术防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：破魔~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：破幻~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：咒法~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：战斗防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：意外~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：战场~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：攻击伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：失能~ SET descfixed = 1 END
+		PATCH_IF (readtype == 12) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：综合~ SET descfixed = 1 END
+		PATCH_IF (readtype == 13) BEGIN SPRINT effdesc ~%effdesc%~^~吸收第二类型：非战斗~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，总共吸收%readamount%~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 227 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：防护系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：咒法系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：预言系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：附魔系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：幻术系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：塑能系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：死灵系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：改变系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：全部~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，总共反弹%readamount%次~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 228 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：法术防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：特殊防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：幻术防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：破魔~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：破幻~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：咒法~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：战斗防护~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：意外~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：战场~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：攻击伤害~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：失能~ SET descfixed = 1 END
+		PATCH_IF (readtype == 12) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：综合~ SET descfixed = 1 END
+		PATCH_IF (readtype == 13) BEGIN SPRINT effdesc ~%effdesc%~^~反弹第二类型：非战斗~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，总共反弹%readamount%次~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 229 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个防护系法术的效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个咒法系法术的效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个预言系法术的效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个附魔系法术的效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个幻术系法术的效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个塑能系法术的效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个死灵系法术的效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个改变系法术的效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个任意学派法术的效果~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 230 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为法术防护的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为特殊防护的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为幻术防护的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为破魔的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为破幻的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为咒法的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为战斗防护的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为意外的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为战场的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为攻击伤害的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为失能的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 12) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为综合的法术效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 13) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个第二类型为非战斗的法术效果~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 231 BEGIN
+		SPRINT effdesc ~%effdesc%~^~时间停止~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 232 BEGIN
+		PATCH_MATCH readtype
+		WITH
+			0 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：被攻击命中~ SET descfixed = 1 END
+			1 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：发现敌人~ SET descfixed = 1 END
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：HP小于50％~ SET descfixed = 1 END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：HP小于25％~ SET descfixed = 1 END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：HP小于10％~ SET descfixed = 1 END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：处于无助状态~ SET descfixed = 1 END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：中毒~ SET descfixed = 1 END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：遭受攻击~ SET descfixed = 1 END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：4呎内存在生物~ SET descfixed = 1 END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：10呎内存在生物~ SET descfixed = 1 END
+			11 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：受伤~ SET descfixed = 1 END
+			12 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：杀死生物~ SET descfixed = 1 END
+			13 BEGIN PATCH_IF readamount == 0 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：处于时间段：~ SET descfixed = 1 END END
+			14 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：%readspecial%呎内存在生物~ SET descfixed = 1 END
+			15 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：有生物（含自身）处于~ SET descfixed = 1 END
+			16 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：自身死亡~ SET descfixed = 1 END
+			17 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：有生物（含自身）死亡~ SET descfixed = 1 END
+			18 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：被超度~ SET descfixed = 1 END
+			19 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：HP小于%readspecial%~ SET descfixed = 1 END
+			20 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：HP小于%readspecial%％~ SET descfixed = 1 END
+			21 BEGIN SPRINT effdesc ~%effdesc%~^~符合条件施法：处于~ SET descfixed = 1 END
+			DEFAULT SET descfixed = 0
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF (readtype == 13) BEGIN
+				PATCH_MATCH readspecial
+					WITH
+					0 BEGIN SPRINT effdesc ~%effdesc%~^~白天~ END
+					1 BEGIN SPRINT effdesc ~%effdesc%~^~黄昏~ END
+					2 BEGIN SPRINT effdesc ~%effdesc%~^~夜晚~ END
+					3 BEGIN SPRINT effdesc ~%effdesc%~^~早晨~ END
+					DEFAULT SPRINT effdesc ~%effdesc%~^~（时间出错）~
+				END
+			END
+			PATCH_IF readtype == 15 BEGIN
+				LOOKUP_IDS_SYMBOL_OF_INT idsentry ~state~ readspecial
+				SPRINT effdesc ~%effdesc%~^~%idsentry%状态~
+			END
+			PATCH_IF readtype == 21 BEGIN
+				LOOKUP_IDS_SYMBOL_OF_INT idsentry ~splstate~ readspecial
+				SPRINT effdesc ~%effdesc%~^~%idsentry%状态~
+			END
+			PATCH_MATCH readamount
+				WITH
+				0 BEGIN SPRINT effdesc ~%effdesc%~^~时，对自身施法：~ END
+				1 BEGIN SPRINT effdesc ~%effdesc%~^~时，对最后攻击者施法：~ END
+				2 BEGIN SPRINT effdesc ~%effdesc%~^~时，对最近的敌人施法：~ END
+				DEFAULT SPRINT effdesc ~%effdesc%~^~时，对最近的生物施法：~
+			END
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+			SPRINT effdesc ~%effdesc%~^~%namestr%~
+			PATCH_IF location == 2 THEN BEGIN
+				PATCH_IF STRING_LENGTH ~%readres2%~ > 0 THEN BEGIN 
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres2%~ RET namestr END
+					SPRINT effdesc ~%effdesc%~^~、%namestr%~
+				END
+				PATCH_IF STRING_LENGTH ~%readres3%~ > 0 THEN BEGIN 
+					LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres3%~ RET namestr END
+					SPRINT effdesc ~%effdesc%~^~、%namestr%~
+				END
+				PATCH_IF readpara3 == 1 THEN BEGIN SPRINT effdesc ~%effdesc%~^~，如同意外术~ END
+			END
+			PATCH_IF (readspecial & 0b00000001) = 0b00000001 THEN BEGIN
+				SPRINT effdesc ~%effdesc%~^~(仅触发一次)~
+			END
+			PATCH_IF (readspecial & 0b00000010) = 0b00000010 THEN BEGIN
+				SPRINT effdesc ~%effdesc%~^~(法术由原施法者向检查此条件的生物施展)~
+			END
+			PATCH_IF (readspecial & 0b00000100) = 0b00000100 THEN BEGIN
+				SPRINT effdesc ~%effdesc%~^~(不显示施法光球和文字提示)~
+			END
+			PATCH_IF (readspecial & 0b00001000) = 0b00001000 THEN BEGIN
+				SPRINT effdesc ~%effdesc%~^~(忽略法术距离限制)~
+			END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 233 BEGIN
+		SET readamount1 = readamount / 8	//original class
+		SET readamount = readamount MODULO 8	//active class
+		SET readmode = readtype BLSR 16
+		SET readtype = readtype BAND 0xffff
+		PATCH_IF !VARIABLE_IS_SET $wprof_namestring("%readtype%") BEGIN
+			INNER_ACTION BEGIN
+				COPY_EXISTING ~WEAPPROF.2DA~ ~override~
+					COUNT_2DA_ROWS 12 rows
+					FOR ( index = 1 ; index < rows ; index = index + 1 ) BEGIN
+						READ_2DA_ENTRY index 1 12 wprof_id
+						PATCH_IF wprof_id < 116 BEGIN
+							READ_2DA_ENTRY index 2 12 wprof_name
+							PATCH_IF (wprof_name > 0 && wprof_name < 2147483646) BEGIN
+								GET_STRREF wprof_name wprof_string
+								PATCH_IF (~%wprof_string%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)&&(STRING_LENGTH ~%wprof_string%~ != 0) BEGIN
+									SPRINT $wprof_namestring(~%wprof_id%~) ~%wprof_string%~
+								END
+							END
+						END
+					END
+				BUT_ONLY
+			END
+		END
+		PATCH_IF (VARIABLE_IS_SET $wprof_namestring("%readtype%") && (readmode == 0 || readmode == 1) && (readamount1 >= 0)) BEGIN
+			SPRINT temp_string $wprof_namestring(~%readtype%~)
+			SET descfixed = 1
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF (readamount1 > 0) BEGIN	//有旧职业
+				PATCH_IF (readmode == 0) BEGIN
+					SPRINT effdesc ~%effdesc%~^~设置旧职业%temp_string%熟练度为%readamount%星，新职业%temp_string%熟练度为%readamount1%星~
+				END ELSE BEGIN
+					SPRINT effdesc ~%effdesc%~^~提升旧职业%temp_string%熟练度%readamount%星，新职业%temp_string%熟练度%readamount1%星~
+				END
+			END ELSE BEGIN	//readamount1 = 0只有当前职业
+				PATCH_IF (readmode == 0) BEGIN
+					SPRINT effdesc ~%effdesc%~^~设置%temp_string%熟练度为%readamount%星~
+				END ELSE BEGIN
+					SPRINT effdesc ~%effdesc%~^~提升%temp_string%熟练度%readamount%星~
+				END
+			END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 234 BEGIN
+		SET readmode = readtype BLSR 16
+		SET readtype = readtype BAND 0xffff
+		PATCH_IF (readmode == 0) BEGIN SPRINT effdesc ~%effdesc%~^~连锁意外术~ SET descfixed = 1 END
+		PATCH_IF (readmode == 1) BEGIN SPRINT effdesc ~%effdesc%~^~普通意外术~ SET descfixed = 1 END
+		PATCH_IF (readmode == 2) BEGIN SPRINT effdesc ~%effdesc%~^~序列器~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			SET readtype = (readtype > 3) ? 3 : readtype
+			SPRINT effdesc ~%effdesc%~^~，最高可装填%readamount%级法术，数量为%readtype%~
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 235 BEGIN
+		PATCH_IF (readtype == 0)||(readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~吹飞，速度%readamount%远离发生地~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~吹飞，速度%readamount%远离使用者~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~吹飞，速度%readamount%朝向发生地~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~吹飞，速度%readamount%朝向使用者~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 236 BEGIN
+		PATCH_IF (readtype == 0)||(readtype > 3) BEGIN SPRINT effdesc ~%effdesc%~^~复制~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~误导~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~投影~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~拟像~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 238 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解离生物类型：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 239 BEGIN
+		SPRINT effdesc ~%effdesc%~^~远视术~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 240 BEGIN
+		INNER_ACTION BEGIN
+			COPY_EXISTING ~STATDESC.2DA~ ~override~
+				COUNT_2DA_ROWS 3 maxrows
+				FOR ( index = 1 ; index < maxrows ; index = index + 1 ) BEGIN
+					READ_2DA_ENTRY index 0 3 readiconcode
+					READ_2DA_ENTRY index 1 3 readicondesc
+					PATCH_IF readiconcode == readtype THEN BEGIN
+						PATCH_IF readicondesc > 0 THEN BEGIN
+							GET_STRREF readicondesc tempdesc
+							SPRINT effdesc ~%effdesc%~^~移除图标：%tempdesc%~ SET descfixed = 1
+							SET index = maxrows + 1
+						END
+					END
+				END
+			BUT_ONLY
+		END
+		PATCH_IF descfixed == 1 THEN BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 241 BEGIN
+		PATCH_IF (readamount == 0) BEGIN SPRINT effdesc ~%effdesc%~^~控制生物类型：全部~ SET descfixed = 1 END
+		PATCH_IF (readamount == 1) BEGIN SPRINT effdesc ~%effdesc%~^~控制生物类型：人类~ SET descfixed = 1 END
+		PATCH_IF (readamount == 2) BEGIN SPRINT effdesc ~%effdesc%~^~控制生物类型：动物~ SET descfixed = 1 END
+		PATCH_IF (readamount == 4) BEGIN SPRINT effdesc ~%effdesc%~^~控制生物类型：不死生物~ SET descfixed = 1 END
+		PATCH_IF (readamount == 5) BEGIN SPRINT effdesc ~%effdesc%~^~控制生物类型：巨人~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 242 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除困惑~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 243 BEGIN
+		SPRINT effdesc ~%effdesc%~^~吸取%readamount%个物品使用次数~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 244 BEGIN
+		SPRINT effdesc ~%effdesc%~^~吸取%readamount%个法师法术~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 245 BEGIN
+		SPRINT effdesc ~%effdesc%~^~1％概率陷入狂暴~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 246 BEGIN
+		SPRINT effdesc ~%effdesc%~^~I型狂暴~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 247 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~II型狂暴~ SET descfixed = 1 END
+		ELSE BEGIN SPRINT effdesc ~%effdesc%~^~战斗中II型狂暴~ SET descfixed = 1 END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	
+	PATCH_IF opcode == 248 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT tempdesc ~%effdesc%~^~设置近战攻击触发特定效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT tempdesc ~%effdesc%~^~设置徒手攻击触发特定效果~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			INNER_ACTION BEGIN
+				ACTION_IF FILE_EXISTS_IN_GAME ~%readres%.eff~ THEN BEGIN
+					COPY_EXISTING ~%readres%.eff~ ~override~
+					LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed location = 2 viaopcode = opcode RET effdesc END
+					PATCH_IF STRING_LENGTH ~%effdesc%~ > 0 THEN BEGIN
+						SPRINT effdesc ~%tempdesc%~^~%effdesc%~
+						SET descfixed = 2
+					END
+				END
+			END
+		END
+		PATCH_IF (descfixed == 2) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END ELSE BEGIN
+			SET descfixed = 0	//描述不完全=完全不描述
+		END
+	END
+	
+	PATCH_IF opcode == 249 BEGIN
+		SPRINT tempdesc ~%effdesc%~^~设置远程攻击触发特定效果~	//暂存一下
+		INNER_ACTION BEGIN
+			ACTION_IF FILE_EXISTS_IN_GAME ~%readres%.eff~ THEN BEGIN
+				COPY_EXISTING ~%readres%.eff~ ~override~
+				LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed location = 2 viaopcode = opcode RET effdesc END
+				PATCH_IF STRING_LENGTH ~%effdesc%~ > 0 THEN BEGIN
+					SPRINT effdesc ~%tempdesc%~^~%effdesc%~
+					SET descfixed = 1
+				END
+			END
+		END
+		PATCH_IF descfixed == 1 THEN BEGIN
+			SPRINT effdesc ~%effdesc%~^~%idsentry%~
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	
+	PATCH_IF opcode == 250 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~伤害掷骰修正：%readamount%~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 251 BEGIN
+		SPRINT effdesc ~%effdesc%~^~改变战歌效果为特定法术~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 252 BEGIN
+		SPRINT effdesc ~%effdesc%~^~设置特定陷阱~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 255 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF location != 2 THEN BEGIN
+			PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN
+				SPRINT effdesc ~%effdesc%~^~创建物品栏物品（似乎永久存在）：%namestr%，数量%readamount%~ SET descfixed = 1
+				LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+			END
+		END ELSE BEGIN
+			PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN
+				SPRINT effdesc ~%effdesc%~^~创建物品栏物品（似乎永久存在）：%namestr0%，数量%readamount%~ SET descfixed = 1
+				PATCH_IF (readpara3 > 0)||(readpara4 > 0) BEGIN SPRINT effdesc ~%effdesc%~^~／%readpara3%~ END
+				PATCH_IF readpara4 > 0 BEGIN SPRINT effdesc ~%effdesc%~^~／%readpara4%~ END
+				LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+			END
+		END
+	END
+
+	PATCH_IF opcode == 257 BEGIN
+		SPRINT effdesc ~%effdesc%~^~存储%readtype%个法术成为序列，最高存储%readamount%级法术~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 259 BEGIN
+		SPRINT effdesc ~%effdesc%~^~吸收并恢复%readtype%级法术，共吸收%readamount%次~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 261 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~恢复一个最高%readamount%级的奥术~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~恢复一个最高%readamount%级的神术~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 262 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~视距范围修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~视距范围设为：%readamount%~ SET descfixed = 1 END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 263 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~背刺倍数修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~背刺倍数设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~背刺倍数设为现有的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 264 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~以“项链>铠甲>腰带>鞋>斗篷>护手>头盔>左右手戒指>副手>弹药>物品栏>武器的顺序掉落第一件装备”~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~丢弃快速武器栏装备~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 265 BEGIN
+		PATCH_IF STRING_LENGTH ~%readres%~ > 0 THEN BEGIN
+			PATCH_IF location == 2 THEN BEGIN
+				PATCH_IF STRING_LENGTH ~%readres2%~ > 0 THEN BEGIN SPRINT readres ~readres~^~readres2~ END
+				PATCH_IF STRING_LENGTH ~%readres3%~ > 0 THEN BEGIN SPRINT readres ~readres~^~readres3~ END
+			END
+			PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~设置全局变量%readres%的值为%readamount%~ SET descfixed = 1 END
+			PATCH_IF (readtype == 1) BEGIN
+				PATCH_IF readamount > "-1" THEN BEGIN
+					SPRINT effdesc ~%effdesc%~^~全局变量%readres%的值＋%readamount%~ SET descfixed = 1
+				END ELSE BEGIN
+					SPRINT effdesc ~%effdesc%~^~全局变量%readres%的值%readamount%~ SET descfixed = 1
+				END
+			END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 266 BEGIN
+		SPRINT effdesc ~%effdesc%~^~移除对指定法术的防护~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 268 BEGIN
+		SPRINT effdesc ~%effdesc%~^~和队员共享视野~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 269 BEGIN
+		SPRINT effdesc ~%effdesc%~^~震动窗口（力度%readamount%）~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 270 BEGIN
+		SPRINT effdesc ~%effdesc%~^~解除暂停~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 270 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT tempdesc ~%effdesc%~^~隐藏目标外形（无法行动，仅能执行瞬发的脚本动作）~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT tempdesc ~%effdesc%~^~隐藏目标外形（同时移除脚本）~ SET descfixed = 1 END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	
+	PATCH_IF opcode == 272 BEGIN
+		PATCH_IF location == 2 THEN BEGIN SET readpara3 = (readpara3 == 0)? 1 : readpara3 END ELSE BEGIN SET readpara3 = 1 END
+		PATCH_IF location == 2 THEN BEGIN SET readpara4 = (readpara4 == 0)? 1 : readpara4 END ELSE BEGIN SET readpara4 = 1 END		
+		PATCH_IF (readtype == 0)&&(readamount != 0) BEGIN SPRINT tempdesc ~%effdesc%~^~每秒一次，重复应用特定效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT tempdesc ~%effdesc%~^~应用特定效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT tempdesc ~%effdesc%~^~每%readpara4%秒%readamount%次，重复应用特定效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT tempdesc ~%effdesc%~^~每%readamount%×%readpara4%秒一次，重复应用特定效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT tempdesc ~%effdesc%~^~每%readamount%×%readpara4%秒%readpara3%次，重复应用特定效果~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			INNER_ACTION BEGIN
+				ACTION_IF FILE_EXISTS_IN_GAME ~%readres%.eff~ THEN BEGIN
+					COPY_EXISTING ~%readres%.eff~ ~override~
+					LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed location = 2 viaopcode = opcode RET effdesc END
+					PATCH_IF STRING_LENGTH ~%effdesc%~ > 0 THEN BEGIN
+						SPRINT effdesc ~%tempdesc%~^~%effdesc%~
+						SET descfixed = 2
+					END
+				END
+			END
+		END
+		PATCH_IF (descfixed == 2) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END ELSE BEGIN
+			SET descfixed = 0	//描述不完全=完全不描述
+		END
+	END
+		
+	PATCH_IF opcode == 273 BEGIN
+		SPRINT effdesc ~%effdesc%~^~空气滤净~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 274 BEGIN
+		SPRINT effdesc ~%effdesc%~^~传送到随机敌对目标~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 275 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~阴影躲藏数值修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~阴影躲藏数值设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~阴影躲藏数值设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 276 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~侦测幻象数值修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~侦测幻象数值设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~侦测幻象数值设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 277 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~设置陷阱数值修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~设置陷阱数值设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~设置陷阱数值设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 278 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~命中修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~命中设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~命中设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 279 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的潜行按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的盗贼能力按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的法术选择按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的快捷法术I按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的快捷法术II按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的快捷法术III按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的超度按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的对话按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的使用物品能力按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的快捷物品I按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的诗人演奏按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 11) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的快捷物品II按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 12) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的快捷物品III按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 13) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的施展特殊能力按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 14) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的寻找陷阱按钮~ SET descfixed = 1 END
+		PATCH_IF (readtype == 15) BEGIN SPRINT effdesc ~%effdesc%~^~还原被禁止的物品栏按钮~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 280 BEGIN
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~下次施法带有狂乱波动~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~施法带有狂乱波动~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 281 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~狂乱魔法掷骰修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~狂乱魔法掷骰设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~狂乱魔法掷骰设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	
+	PATCH_IF opcode == 283 BEGIN
+		SPRINT tempdesc ~%effdesc%~^~对生物类型应用指定诅咒效果~	//暂存一下
+		INNER_ACTION BEGIN
+			ACTION_IF FILE_EXISTS_IN_GAME ~%readres%.eff~ THEN BEGIN
+				COPY_EXISTING ~%readres%.eff~ ~override~
+				LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed location = 2 viaopcode = opcode RET effdesc END
+				PATCH_IF STRING_LENGTH ~%effdesc%~ > 0 THEN BEGIN
+					SPRINT effdesc ~%tempdesc%~^~%effdesc%：~
+					SET descfixed = 1
+				END
+			END
+		END
+		PATCH_IF descfixed == 1 THEN BEGIN
+			PATCH_MATCH readtype
+			WITH
+				2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+				3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+				4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+				5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+				6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+				7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+				8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+				9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+				DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+			END
+			SPRINT effdesc ~%effdesc%~^~%idsentry%~
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	
+	PATCH_IF opcode == 284 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~近战THAC0修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~近战THAC0设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~近战THAC0设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 285 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~近战伤害修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~近战伤害设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~近战伤害设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 286 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~远程伤害修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~远程伤害设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~远程伤害设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 288 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~徒手THAC0修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~徒手THAC0设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~徒手THAC0设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 289 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~徒手伤害修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~徒手伤害设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~徒手伤害设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 292 BEGIN
+		PATCH_IF (readtype != 0) BEGIN SPRINT effdesc ~%effdesc%~^~免疫背刺~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 295 BEGIN
+		SPRINT effdesc ~%effdesc%~^~防止永久死亡~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 297 BEGIN
+		PATCH_IF (readtype != 0) BEGIN
+			SPRINT effdesc ~%effdesc%~^~免疫超度~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 299 BEGIN
+		PATCH_IF (readspecial == 0) BEGIN SPRINT effdesc ~%effdesc%~^~狂乱魔法掷骰修正%readamount%（显示混乱护盾图标）~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 1) BEGIN SPRINT effdesc ~%effdesc%~^~狂乱魔法掷骰修正%readamount%（显示高级混乱护盾图标）~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 301 BEGIN
+		PATCH_IF (readspecial == 0) BEGIN SPRINT effdesc ~%effdesc%~^~~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 1) BEGIN SPRINT effdesc ~%effdesc%~^~近战攻击~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 2) BEGIN SPRINT effdesc ~%effdesc%~^~远程攻击~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 3) BEGIN SPRINT effdesc ~%effdesc%~^~魔法攻击~ SET descfixed = 1 END
+		PATCH_IF location == 2 THEN BEGIN
+			PATCH_IF readpara3 > 0 THEN BEGIN
+				LOOKUP_IDS_SYMBOL_OF_INT idsentry ~ITEMCAT~ readpara3
+				SPRINT effdesc ~%effdesc%~^~（武器类型限制：%idsentry%）~
+			END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			SET critiacal = readamount * 5
+			SPRINT effdesc ~%effdesc%~^~致命一击率修正：%critiacal%％~
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 302 BEGIN
+		PATCH_IF (readtype != 0) BEGIN
+			SPRINT effdesc ~%effdesc%~^~万能巧手~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	
+	PATCH_IF opcode == 303 BEGIN
+		PATCH_IF (readtype & 0b00000001) = 0b00000001 BEGIN
+			SPRINT effdesc ~%effdesc%~^~每击背刺，不需要隐形和位于敌人背后~ SET descfixed = 1
+		END ELSE BEGIN
+			PATCH_IF (readtype & 0b00000010) = 0b00000010 BEGIN
+				SPRINT effdesc ~%effdesc%~^~每击背刺，不需要隐形~ SET descfixed = 1
+			END ELSE BEGIN
+				PATCH_IF (readtype & 0b00000100) = 0b00000100 BEGIN
+					SPRINT effdesc ~%effdesc%~^~每击背刺，不需要位于敌人背后~ SET descfixed = 1
+				END
+			END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+
+	PATCH_IF opcode == 304 BEGIN
+		SPRINT effdesc ~%effdesc%~^~群体复活队员~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 305 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~副手命中修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~副手命中设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~副手命中设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 306 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~主手命中修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~主手命中设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~主手命中设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 309 BEGIN
+		PATCH_IF STRING_LENGTH ~%readres%~ > 0 THEN BEGIN
+			PATCH_IF location == 2 THEN BEGIN
+				PATCH_IF STRING_LENGTH ~%readres2%~ > 0 THEN BEGIN SPRINT readres ~readres~^~readres2~ END
+				PATCH_IF STRING_LENGTH ~%readres3%~ > 0 THEN BEGIN SPRINT readres ~readres~^~readres3~ END
+			END
+			PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~设置局部变量%readres%的值为%readamount%~ SET descfixed = 1 END
+			PATCH_IF (readtype == 1) BEGIN
+				PATCH_IF readamount > "-1" THEN BEGIN
+					SPRINT effdesc ~%effdesc%~^~局部变量%readres%的值＋%readamount%~ SET descfixed = 1
+				END ELSE BEGIN
+					SPRINT effdesc ~%effdesc%~^~局部变量%readres%的值%readamount%~ SET descfixed = 1
+				END
+			END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 310 BEGIN
+		PATCH_IF (readtype != 0) BEGIN
+			SPRINT effdesc ~%effdesc%~^~免疫时间停止~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 311 BEGIN
+		SPRINT effdesc ~%effdesc%~^~随机许愿~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 316 BEGIN
+		SPRINT effdesc ~%effdesc%~^~魔法休息~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF (opcode == 318)||(opcode == 324) BEGIN
+		PATCH_IF (location == 0)&&(NOT ~%SOURCE_FILE%~ STRING_COMPARE_CASE ~%readres%.spl~) THEN BEGIN SET descfixed = 9 END	//标记目标法术是当前法术本身
+		SPRINT effdesc ~%effdesc%~^~满足特定条件~
+		INNER_ACTION BEGIN
+			COPY_EXISTING ~splprot.2da~ ~override~
+				COUNT_2DA_ROWS 4 maxrows
+				PATCH_IF readtype < maxrows BEGIN	//splprot.2da中第几行
+					LPF CHECK_SPLPROT_DESC INT_VAR chkprotline = readtype RET chkprotdesc END
+					SPRINT effdesc ~%effdesc%~^~%chkprotdesc%时防护特定法术／物品效果：~
+				END
+			BUT_ONLY
+		END
+		PATCH_IF descfixed == 9 THEN BEGIN	//目标法术是当前法术本身		
+			SPRINT effdesc ~%effdesc%~^~(法术效果)当前法术本身~ SET descfixed = 1
+		END ELSE BEGIN		
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+			PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed > 0))) BEGIN
+				SPRINT effdesc ~%effdesc%~^~(法术效果)%namestr%~ SET descfixed = 1
+				PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effdesc ~%effdesc%~^~[法师]~ END
+				PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effdesc ~%effdesc%~^~[牧师]~ END
+			END
+		END
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的物品~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知物品~)||(detailed > 0))) BEGIN SPRINT effdesc ~%effdesc%~^~(物品效果)%namestr%~ SET descfixed = 2 END
+		PATCH_IF (descfixed > 0) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF (opcode == 319)&&(location == 1) BEGIN
+		READ_BYTE (3 + effoffset + 0x30 * (firsteff + effectnum - 1)) readpower
+		PATCH_IF (readpower == 0) BEGIN SPRINT effdesc ~%effdesc%~^~禁止生物类型使用本物品：~ SET descfixed = 1 END
+		PATCH_IF (readpower == 1) BEGIN SPRINT effdesc ~%effdesc%~^~限定生物类型使用本物品：~ SET descfixed = 1 END
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			10 BEGIN
+				PATCH_IF (readpower == "-1") BEGIN
+					SPRINT idsentry ~主角~
+				END ELSE BEGIN
+					GET_STRREF readpower idsentry
+					SPRINT idsentry ~生物名称为%idsentry%~ 
+				END
+			END
+			11 BEGIN			
+				PATCH_IF ((STRING_LENGTH ~%readres%~) == 0) BEGIN
+					SPRINT idsentry ~主角~
+				END ELSE BEGIN
+					SPRINT idsentry ~生物代码为%readres%~ 
+				END
+			END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%~
+		PATCH_IF (descfixed > 0) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 320 BEGIN
+		PATCH_IF (readamount == 0) BEGIN SPRINT effdesc ~%effdesc%~^~改变天气：晴~ SET descfixed = 1 END
+		PATCH_IF (readamount == 1) BEGIN SPRINT effdesc ~%effdesc%~^~改变天气：雨（需在游戏选项中开启天气）~ SET descfixed = 1 END
+		PATCH_IF (readamount == 2) BEGIN SPRINT effdesc ~%effdesc%~^~改变天气：雪（需在游戏选项中开启天气）~ SET descfixed = 1 END
+		PATCH_IF (readamount == 3) BEGIN SPRINT effdesc ~%effdesc%~^~改变天气：雾（需在游戏选项中开启天气）~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+	PATCH_IF opcode == 321 BEGIN
+		SPRINT effdesc ~%effdesc%~^~移除特定法术／物品等效果：~
+		PATCH_IF (location == 0)&&(NOT ~%SOURCE_FILE%~ STRING_COMPARE_CASE ~%readres%.spl~) THEN BEGIN	//目标法术是当前法术本身
+			SPRINT effdesc ~%effdesc%~^~(法术效果)当前法术本身~ SET descfixed = 1
+		END ELSE BEGIN
+			PATCH_IF (FILE_EXISTS_IN_GAME ~%readres%.spl~)&&((readtype == 0)||(readtype == 2)) BEGIN
+				LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END	//如果法术文件等于源文件，则不显示详细
+				SPRINT effdesc ~%effdesc%~^~(法术效果)%namestr%~ SET descfixed = 1
+				PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effdesc ~%effdesc%~^~[法师]~ END
+				PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effdesc ~%effdesc%~^~[牧师]~ END
+			END
+		END
+		PATCH_IF (FILE_EXISTS_IN_GAME ~%readres%.itm~)&&((readtype == 0)||(readtype == 1)) BEGIN
+			LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR itmcode = EVAL ~%readres%~ RET namestr END
+			SPRINT effdesc ~%effdesc%~^~(物品效果)%namestr%~
+			SET descfixed = 2
+		END
+		PATCH_IF (descfixed > 0) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 322 BEGIN
+		SPRINT effdesc ~%effdesc%~^~规避范围效果（遇到经特殊豁免设置的效果才生效）~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 323 BEGIN
+		PATCH_IF (readtype == 0)&&(readspecial == 0) BEGIN SPRINT effdesc ~%effdesc%~^~超度等级修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1)&&(readspecial == 0) BEGIN SPRINT effdesc ~%effdesc%~^~超度等级设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 1) BEGIN SPRINT effdesc ~%effdesc%~^~超度等级随目标最高等级提升~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 325 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~所有豁免修正：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~所有豁免设为：%readamount%~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~所有豁免设为：当前的%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 326 BEGIN
+		SPRINT effdesc ~%effdesc%~^~满足特定条件~
+		INNER_ACTION BEGIN
+			COPY_EXISTING ~splprot.2da~ ~override~
+				COUNT_2DA_ROWS 4 maxrows
+				PATCH_IF readtype < maxrows BEGIN	//splprot.2da中第几行
+					LPF CHECK_SPLPROT_DESC INT_VAR chkprotline = readtype RET chkprotdesc END
+					SPRINT effdesc ~%effdesc%~^~%chkprotdesc%时应用特定法术：~
+				END
+			BUT_ONLY
+		END
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		SPRINT effdesc ~%effdesc%~^~%namestr%~ SET descfixed = 1
+		PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effdesc ~%effdesc%~^~[法师]~ END
+		PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effdesc ~%effdesc%~^~[牧师]~ END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 328 BEGIN
+		PATCH_IF readspecial == 0 BEGIN
+			PATCH_MATCH readtype
+			WITH
+				0 BEGIN SPRINT idsentry ~混乱命令~ SET descfixed = 1 END
+				1 BEGIN SPRINT idsentry ~施法失败~ SET descfixed = 1 END
+				2 BEGIN SPRINT idsentry ~痛苦~ SET descfixed = 1 END
+				3 BEGIN SPRINT idsentry ~毒咒~ SET descfixed = 1 END
+				4 BEGIN SPRINT idsentry ~血怒~ SET descfixed = 1 END
+				5 BEGIN SPRINT idsentry ~猫之优雅~ SET descfixed = 1 END
+				6 BEGIN SPRINT idsentry ~霉菌之触~ SET descfixed = 1 END
+				7 BEGIN SPRINT idsentry ~火焰之袍~ SET descfixed = 1 END
+				DEFAULT SET descfixed = 0
+			END
+		END
+		PATCH_IF readspecial == 1 BEGIN LOOKUP_IDS_SYMBOL_OF_INT idsentry ~splstate~ readtype END
+		PATCH_IF NOT IS_AN_INT idsentry THEN BEGIN
+			SET descfixed = 1		
+			SPRINT effdesc ~%effdesc%~^~设置状态：%idsentry%~
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 329 BEGIN
+		SPRINT effdesc ~%effdesc%~^~减缓毒发~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 331 BEGIN
+		SPRINT effdesc ~%effdesc%~^~随机生物召唤~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 332 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~所有类型伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~火焰伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~寒冷伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 3) BEGIN SPRINT effdesc ~%effdesc%~^~电击伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 4) BEGIN SPRINT effdesc ~%effdesc%~^~强酸伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~魔法伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~毒素伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~挥砍伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~穿刺伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~钝击伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (readtype == 10) BEGIN SPRINT effdesc ~%effdesc%~^~远程伤害修正：%readamount%％~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 333 BEGIN
+		SPRINT effdesc ~%effdesc%~^~静电荷（指定法术多次生效）~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 334 BEGIN
+		SPRINT effdesc ~%effdesc%~^~施展超度~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 337 BEGIN
+		SPRINT effdesc ~%effdesc%~^~移除效果条目：~ SET descfixed = 1
+		INNER_ACTION BEGIN
+			COPY ~DetailedDescription\2da\dopcodes.2da~ ~override~
+				COUNT_2DA_ROWS 2 maxrows
+				FOR ( index = 0 ; index < maxrows ; index = index + 1 ) BEGIN
+					READ_2DA_ENTRY index 0 2 readopcode
+					READ_2DA_ENTRY index 1 2 readopcodename
+					PATCH_IF readopcode == readtype BEGIN
+						SPRINT effdesc ~%effdesc%~^~%readopcodename%~
+						SET index = maxrows + 1
+					END
+				END
+				PATCH_IF index != (maxrows + 1) BEGIN
+					SPRINT effdesc ~%effdesc%~^~超出范围的效果编号（#%readtype%）~
+				END
+			BUT_ONLY
+		END
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 338 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~禁止休息~ SET descfixed = 1 END
+		PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~禁止存档~ SET descfixed = 1 END
+		PATCH_IF (readtype == 2) BEGIN SPRINT effdesc ~%effdesc%~^~禁止休息和存档~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 340 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF STRING_LENGTH ~%namestr%~ > 0 THEN BEGIN
+			SPRINT effdesc ~%effdesc%~^~背刺成功施展法术：%namestr%~ SET descfixed = 1
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effdesc ~%effdesc%~^~[法师]~ END
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effdesc ~%effdesc%~^~[牧师]~ END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 341 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF STRING_LENGTH ~%namestr%~ > 0 THEN BEGIN		
+			PATCH_IF (readspecial == 0) BEGIN SPRINT effdesc ~%effdesc%~^~致命一击（会被头盔和武器免疫阻挡）时施展指定法术：~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 1) BEGIN SPRINT effdesc ~%effdesc%~^~近战致命一击（会被头盔和武器免疫阻挡）时施展指定法术：~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 2) BEGIN SPRINT effdesc ~%effdesc%~^~远程致命一击（会被头盔和武器免疫阻挡）时施展指定法术：~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 3) BEGIN SPRINT effdesc ~%effdesc%~^~法术致命一击（会被头盔和武器免疫阻挡）时施展指定法术：~ SET descfixed = 1 END
+			SPRINT effdesc ~%effdesc%~^~%namestr%~
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effdesc ~%effdesc%~^~[法师]~ END
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effdesc ~%effdesc%~^~[牧师]~ END
+			PATCH_IF location == 2 THEN BEGIN
+				PATCH_IF readpara3 > 0 THEN BEGIN
+					LOOKUP_IDS_SYMBOL_OF_INT idsentry ~ITEMCAT~ readpara3
+					SPRINT effdesc ~%effdesc%~^~（武器类型限制：%idsentry%）~
+				END
+			END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 343 BEGIN
+		SPRINT effdesc ~%effdesc%~^~HP对调~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+	PATCH_IF opcode == 344 BEGIN
+		SPRINT effdesc ~%effdesc%~^~对生物类型：~ SET descfixed = 1
+		PATCH_MATCH readtype
+		WITH
+			2 BEGIN SPRINT effdesc ~%effdesc%~^~（敌友类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~EA~ readamount END
+			3 BEGIN SPRINT effdesc ~%effdesc%~^~（一般类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~General~ readamount END
+			4 BEGIN SPRINT effdesc ~%effdesc%~^~（种族类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Race~ readamount END
+			5 BEGIN SPRINT effdesc ~%effdesc%~^~（职业类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Class~ readamount END
+			6 BEGIN SPRINT effdesc ~%effdesc%~^~（特殊类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Specific~ readamount END
+			7 BEGIN SPRINT effdesc ~%effdesc%~^~（性别类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Gender~ readamount END
+			8 BEGIN SPRINT effdesc ~%effdesc%~^~（阵营类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Align~ readamount END
+			9 BEGIN SPRINT effdesc ~%effdesc%~^~（宗派类型）~ LOOKUP_IDS_SYMBOL_OF_INT idsentry ~Kit~ readamount END
+			DEFAULT SPRINT effdesc ~%effdesc%~^~（错误的类型代码）~ SPRINT idsentry ~~
+		END
+		PATCH_IF location == 2 THEN BEGIN
+			PATCH_IF readpara3 == 0 THEN BEGIN SPRINT effdesc ~%effdesc%~^~（限当前武器）~ END
+			PATCH_IF readpara3 == 1 THEN BEGIN SPRINT effdesc ~%effdesc%~^~（限主手武器）~ END
+			PATCH_IF readpara3 == 2 THEN BEGIN SPRINT effdesc ~%effdesc%~^~（限副手武器）~ END
+			PATCH_IF readpara3 == 3 THEN BEGIN SPRINT effdesc ~%effdesc%~^~（主副手武器皆有效）~ END
+			PATCH_IF readpara4 > 0 THEN BEGIN
+				LOOKUP_IDS_SYMBOL_OF_INT idsentry ~ITEMCAT~ readpara4
+				SPRINT effdesc ~%effdesc%~^~（武器类型限制：%idsentry%）~
+			END
+		END
+		SPRINT effdesc ~%effdesc%~^~%idsentry%武器附魔等级视为%readspecial%~
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+	PATCH_IF opcode == 345 BEGIN
+		PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~武器附魔等级设为：＋%readamount%~ SET descfixed = 1 END
+		PATCH_IF location == 2 THEN BEGIN
+			PATCH_IF readpara4 > 0 THEN BEGIN
+				LOOKUP_IDS_SYMBOL_OF_INT idsentry ~ITEMCAT~ readpara4
+				SPRINT effdesc ~%effdesc%~^~（武器类型限制：%idsentry%）~
+			END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 346 BEGIN
+		PATCH_IF (readspecial == 1) BEGIN SPRINT effdesc ~%effdesc%~^~对防护系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 2) BEGIN SPRINT effdesc ~%effdesc%~^~对咒法系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 3) BEGIN SPRINT effdesc ~%effdesc%~^~对预言系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 4) BEGIN SPRINT effdesc ~%effdesc%~^~对附魔系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 5) BEGIN SPRINT effdesc ~%effdesc%~^~对幻术系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 6) BEGIN SPRINT effdesc ~%effdesc%~^~对塑能系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 7) BEGIN SPRINT effdesc ~%effdesc%~^~对死灵系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 8) BEGIN SPRINT effdesc ~%effdesc%~^~对改变系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 9) BEGIN SPRINT effdesc ~%effdesc%~^~对所有系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 10) BEGIN SPRINT effdesc ~%effdesc%~^~对狂乱系~ SET descfixed = 1 END
+		PATCH_IF (descfixed == 1) BEGIN
+			PATCH_IF (readtype == 0) BEGIN SPRINT effdesc ~%effdesc%~^~的豁免修正：%readamount%~ END
+			PATCH_IF (readtype == 1) BEGIN SPRINT effdesc ~%effdesc%~^~的豁免设为：%readamount%~ END
+			SET descfixed = 2
+		END
+		PATCH_IF (descfixed = 2) BEGIN
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 361 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF STRING_LENGTH ~%namestr%~ > 0 THEN BEGIN
+			PATCH_IF (readspecial == 0) BEGIN SPRINT effdesc ~%effdesc%~^~致命失误时（忽略武器有效与否）对自身施展法术：~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 1) BEGIN SPRINT effdesc ~%effdesc%~^~近战致命失误时（忽略武器有效与否）对自身施展法术：~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 2) BEGIN SPRINT effdesc ~%effdesc%~^~远程致命失误时（忽略武器有效与否）对自身施展法术：~ SET descfixed = 1 END
+			PATCH_IF (readspecial == 3) BEGIN SPRINT effdesc ~%effdesc%~^~法术致命失误时（忽略武器有效与否）对自身施展法术：~ SET descfixed = 1 END
+			SPRINT effdesc ~%effdesc%~^~%namestr%~
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPWI~) BEGIN SPRINT effdesc ~%effdesc%~^~[法师]~ END
+			PATCH_IF NOT (~%readres%~ STRING_CONTAINS_REGEXP ~SPPR~) BEGIN SPRINT effdesc ~%effdesc%~^~[牧师]~ END
+			PATCH_IF location == 2 THEN BEGIN
+				PATCH_IF readpara3 > 0 THEN BEGIN
+					LOOKUP_IDS_SYMBOL_OF_INT idsentry ~ITEMCAT~ readpara3
+					SPRINT effdesc ~%effdesc%~^~（武器类型限制：%idsentry%）~
+				END
+			END
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 362 BEGIN
+		PATCH_IF (readspecial == 0) BEGIN SPRINT effdesc ~%effdesc%~^~~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 1) BEGIN SPRINT effdesc ~%effdesc%~^~近战攻击~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 2) BEGIN SPRINT effdesc ~%effdesc%~^~远程攻击~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 3) BEGIN SPRINT effdesc ~%effdesc%~^~魔法攻击~ SET descfixed = 1 END
+		PATCH_IF location == 2 THEN BEGIN
+			PATCH_IF readpara3 > 0 THEN BEGIN
+				LOOKUP_IDS_SYMBOL_OF_INT idsentry ~ITEMCAT~ readpara3
+				SPRINT effdesc ~%effdesc%~^~（武器类型限制：%idsentry%）~
+			END
+		END
+		PATCH_IF (descfixed == 1) BEGIN
+			SET critiacal = readamount * 5
+			SPRINT effdesc ~%effdesc%~^~致命失误率修正：%critiacal%％~
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 363 BEGIN
+		LOOKUP_IDS_SYMBOL_OF_INT idsentry ~MODAL~ readspecial
+		PATCH_IF NOT IS_AN_INT ~%idsentry%~ THEN BEGIN
+			SPRINT effdesc ~%effdesc%~^~打破%idsentry%状态时终止本法术所有效果~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 366 BEGIN
+		LPF SCRAMBLED_TEXT_NAMECHECK INT_VAR showname = (detailed > 2 ? 1 : 2 ) STR_VAR splcode = EVAL ~%readres%~ RET namestr END
+		PATCH_IF ((~%namestr%~ STRING_CONTAINS_REGEXP ~不存在的法术~)&&((~%namestr%~ STRING_CONTAINS_REGEXP ~未知法术~)||(detailed > 0))) BEGIN
+			SPRINT effdesc ~%effdesc%~^~移动时施展法术：%namestr%~ SET descfixed = 1
+			LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+		END
+	END
+
+	PATCH_IF opcode == 367 BEGIN
+		SPRINT effdesc ~%effdesc%~^~生物属性不会低于%readtype%~ SET descfixed = 1
+		LPF APPEND_EFFECT_DESC INT_VAR aopcode = opcode alocation = location afirsteff = firsteff aeffectnum = effectnum STR_VAR adesc = EVAL ~%effdesc%~ RET effdesc = anewdesc END
+	END
+
+//如果没有添加opcode描述，输出空字符串
+	PATCH_IF descfixed == 0 BEGIN
+		SPRINT effdesc ~~
+	END ELSE BEGIN
+		PATCH_IF location == 2 THEN BEGIN
+			SPRINT effdesc ~%effdesc%~^~}~
+		END
+	END
+
+//PATCH_PRINT ~CHECK_ATTACK_EFFECT_output: %effdesc%~
+
+END
+

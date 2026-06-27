@@ -1,15 +1,24 @@
 BACKUP ~DetailedDescription/backup~
 AUTHOR ~shohy@126.com~
-VERSION ~v1.4~
+VERSION ~v2.0~
+AUTO_EVAL_STRINGS
 
 ALWAYS
 
 INCLUDE ~DetailedDescription/lib/desfunctions.tpa~
+INCLUDE ~DetailedDescription/lib/efffunctions.tpa~
+INCLUDE ~DetailedDescription/lib/otherfunctions.tpa~
 
 END
 
 LANGUAGE  ~Simplified Chinese~	~schinese~ 		~DetailedDescription/tra/SY#GARBL.tra~
 
+/*
+BEGIN ~测试~
+COPY_EXISTING ~UNDDAM3.EFF~ ~override~
+LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR location = 2 RET effdesc END
+PRINT ~effdesc=%effdesc%~
+*/
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 BEGIN ~检查整个游戏的中文乱码条目并进行修复（可以不装。主要用于集成多MOD以及安装旧MOD后的编码修正）
 
@@ -268,51 +277,73 @@ END
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-BEGIN ~显示所有细节~
-SUBCOMPONENT ~物品增加详细说明~
 
-OUTER_SET detailed_desc = 1
-
-INCLUDE ~DetailedDescription/lib/handleitem.tpa~
-
-
-BEGIN ~忽略一些繁琐的细节（如移除特定法术、设置状态等）~
+BEGIN ~略去某些功能描述（适用于大部分玩家）~
 SUBCOMPONENT ~物品增加详细说明~
 
 OUTER_SET detailed_desc = 0
 
 INCLUDE ~DetailedDescription/lib/handleitem.tpa~
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-BEGIN ~仅处理已注册法术（例如法术书和部分原版特殊技能）并显示所有细节~
-SUBCOMPONENT ~法术增加详细说明（随等级成长的法术只显示最低级和最高级的效果）~
+BEGIN ~显示所有功能描述（适用于对游戏MOD和引擎有了解的玩家）~
+SUBCOMPONENT ~物品增加详细说明~
 
 OUTER_SET detailed_desc = 1
 
-INCLUDE ~DetailedDescription/lib/handlespella.tpa~
+INCLUDE ~DetailedDescription/lib/handleitem.tpa~
 
+BEGIN ~显示所有细节描述（部分物品描述会很长，适用需要了解游戏每个细节的玩家）~
+SUBCOMPONENT ~物品增加详细说明~
 
-BEGIN ~仅处理已注册法术，忽略一些繁琐的细节（如移除特定法术、设置状态等）~
+OUTER_SET detailed_desc = 2
+
+INCLUDE ~DetailedDescription/lib/handleitem.tpa~
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+BEGIN ~仅处理已注册法术（法术书和部分天生能力），略去某些功能描述~
 SUBCOMPONENT ~法术增加详细说明（随等级成长的法术只显示最低级和最高级的效果）~
 
 OUTER_SET detailed_desc = 0
 
 INCLUDE ~DetailedDescription/lib/handlespella.tpa~
 
+BEGIN ~仅处理已注册法术（法术书和部分天生能力），显示所有功能描述~
+SUBCOMPONENT ~法术增加详细说明（随等级成长的法术只显示最低级和最高级的效果）~
+
+OUTER_SET detailed_desc = 1
+
+INCLUDE ~DetailedDescription/lib/handlespella.tpa~
+
+BEGIN ~仅处理已注册法术（法术书和部分天生能力），显示所有细节描述（部分法术描述会很长）~
+SUBCOMPONENT ~法术增加详细说明（随等级成长的法术只显示最低级和最高级的效果）~
+
+OUTER_SET detailed_desc = 2
+
+INCLUDE ~DetailedDescription/lib/handlespella.tpa~
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-BEGIN ~处理所有法术，并显示所有细节~
+
+BEGIN ~处理所有法术，略去某些功能描述~
+SUBCOMPONENT ~法术增加详细说明（随等级成长的法术只显示最低级和最高级的效果）~
+
+OUTER_SET detailed_desc = 0
+
+INCLUDE ~DetailedDescription/lib/handlespellb.tpa~
+
+BEGIN ~处理所有法术，显示所有功能描述~
 SUBCOMPONENT ~法术增加详细说明（随等级成长的法术只显示最低级和最高级的效果）~
 
 OUTER_SET detailed_desc = 1
 
 INCLUDE ~DetailedDescription/lib/handlespellb.tpa~
 
-
-
-BEGIN ~处理所有法术，忽略细节~
+BEGIN ~处理所有法术，显示所有细节描述（部分法术描述会很长）~
 SUBCOMPONENT ~法术增加详细说明（随等级成长的法术只显示最低级和最高级的效果）~
 
-OUTER_SET detailed_desc = 0
+OUTER_SET detailed_desc = 2
 
 INCLUDE ~DetailedDescription/lib/handlespellb.tpa~
+
+

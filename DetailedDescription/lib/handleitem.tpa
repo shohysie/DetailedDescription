@@ -1,5 +1,6 @@
 COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
-//COPY_EXISTING ~ACIDBL.ITM~ ~override~
+//COPY_EXISTING ~AROW05.ITM~ ~override~
+//COPY_EXISTING_REGEXP ~CLCK[0-9]+.ITM~ ~override~
 	PATCH_IF (SOURCE_SIZE > 0x72) BEGIN
 
 		READ_SHORT 0x1c itemtype
@@ -14,9 +15,9 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 		END
 		
 		SET keepstringref = 0
-		PATCH_IF NOT (~%iddesc%~ STRING_CONTAINS_REGEXP ~＊\(装备\|物品\|战斗\)能力资料补充：~) BEGIN	//已有补充说明，清除
+		PATCH_IF NOT (~%iddesc%~ STRING_CONTAINS_REGEXP ~＊\(装备\|物品\|战斗\)能力[0-9]*资料补充：~) BEGIN	//已有补充说明，清除
 			SET keepstringref = 1
-			REPLACE_TEXTUALLY ~＊\(装备\|物品\|战斗\)能力资料补充：\(.*[%LNL%%MNL%%WNL%]\)*＿~ ~~
+			REPLACE_TEXTUALLY ~＊\(装备\|物品\|战斗\)能力[0-9]*资料补充：\(.*[%LNL%%MNL%%WNL%]\)*＿~ ~~
 		END
 		
 		PATCH_IF (~%iddesc%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)&&(STRING_LENGTH ~%iddesc%~ != 0) BEGIN	//描述文本不为空。STRING_CONTAINS_REGEXP结果是1表示不包含
@@ -61,32 +62,36 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 			END
 		END ELSE BEGIN
 			SPRINT newdesc ~%iddesc%~	//不是中文文本，不去除
-		END			
+		END
+
 		SET controlnum = (~%newdesc%~ STRING_COMPARE ~%iddesc%~)	//相等为0，不相等削过空格为1
 		PATCH_IF controlnum == 1 BEGIN SPRINT iddesc ~%newdesc%~ END	//削过空格的放回iddesc备份，没削过的iddesc也是备份
-
 		SET addnum = 0
 		SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%＊装备能力资料补充：~	//准备修改装备能力描述
 		READ_BYTE 0x18 itmflag1
-		PATCH_IF (itmflag1 & 0b00000100) = 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%无法移动或掉落~ END
-		PATCH_IF (itmflag1 & 0b00010000) = 0b00010000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%诅咒物品~ END		
+		PATCH_IF (itmflag1 & 0b00000100) = 0 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－无法移动或掉落~ END
+		PATCH_IF (itmflag1 & 0b00010000) = 0b00010000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－诅咒物品~ END		
 		PATCH_IF (itemtype != 0)&&(itemtype != 5)&&(itemtype != 8)&&(itemtype != 9)&&(itemtype != 11)&&(itemtype != 14)&&(itemtype != 31)&&(itemtype != 34)&&(itemtype != 35)&&(itemtype != 36)&&(itemtype != 37)&&(itemtype != 50) BEGIN
-			PATCH_IF FILE_CONTAINS_EVALUATED (~ITEMEXCL.2da~ ~%SOURCE_RES%~) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%不能和其它魔法物品同时穿戴~ SET addnum = addnum + 1 END
+			PATCH_IF FILE_CONTAINS_EVALUATED (~ITEMEXCL.2da~ ~%SOURCE_RES%~) BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－不能和其它魔法物品同时穿戴~ SET addnum = addnum + 1 END
 			PATCH_IF itemtype == 7 BEGIN
 				READ_BYTE 0x1b readflag4
-				PATCH_IF (readflag4 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%无法防护致命一击~ END
+				PATCH_IF (readflag4 & 0b00000010) = 0b00000010 BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%－无法防护致命一击~
+				END ELSE BEGIN
+					SPRINT newdesc ~%newdesc%~^~%WNL%－防护致命一击~
+				END
 				SET addnum = addnum + 1
 			END
 			READ_SHORT 0x70 effectamount
 			PATCH_IF effectamount > 0 BEGIN
 				FOR (itmeffect = 1 ; itmeffect < (effectamount + 1) ; ++itmeffect) BEGIN	//遍历各个效果
-					LPF CHECK_EQUIP_EFFECT INT_VAR effectnum = itmeffect pnum = addnum detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc addnum END
+					LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc location = 1 effectnum = itmeffect RET effdesc END
+					PATCH_IF STRING_LENGTH ~%effdesc%~ > 0 THEN BEGIN SPRINT newdesc ~%newdesc%~^~%effdesc%~ SET addnum = addnum + 1 END
 				END
 			END
 		END
-		PATCH_IF addnum == 0 BEGIN SPRINT newdesc ~%iddesc%~ SET addnum = controlnum END	//装备能力完全没有，还原备份去掉“装备能力资料补充”。削过空格值变1表示后面要写入
-
-		//PATCH_PRINT ~descref=%newdesc%~
+		PATCH_IF addnum == 0 BEGIN SPRINT newdesc ~%iddesc%~ SET addnum = controlnum END	//如果装备能力完全没有，还原备份去掉“装备能力资料补充”。削过空格值变1表示后面要写入
+//PATCH_PRINT ~newdesc=%newdesc%~
 
 		//是弹药
 		PATCH_IF (itemtype == 5)||(itemtype == 14)||(itemtype == 31) BEGIN
@@ -151,7 +156,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						//eff1stoffset = effoffset + 0x30 * (abilityeff1st - 1)	//计算第itmability个能力第一个eff的初始地址
 						PATCH_IF abilityeffects > 0 BEGIN
 							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+								LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc firsteff = abilityeff1st effectnum = effectindex RET effdesc END
+								SPRINT newdesc ~%newdesc%~^~%effdesc%~
 							END
 						END
 						
@@ -228,7 +234,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
 						PATCH_IF abilityeffects > 0 BEGIN
 							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+								LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc firsteff = abilityeff1st effectnum = effectindex RET effdesc END
+								SPRINT newdesc ~%newdesc%~^~%effdesc%~
 							END
 						END
 					END
@@ -280,7 +287,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
 						PATCH_IF abilityeffects > 0 BEGIN
 							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+								LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc firsteff = abilityeff1st effectnum = effectindex RET effdesc END
+								SPRINT newdesc ~%newdesc%~^~%effdesc%~
 							END
 						END
 					END
@@ -387,7 +395,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
 						PATCH_IF abilityeffects > 0 BEGIN
 							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+								LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc firsteff = abilityeff1st effectnum = effectindex RET effdesc END
+								SPRINT newdesc ~%newdesc%~^~%effdesc%~
 							END
 						END
 					END
@@ -426,7 +435,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
 						PATCH_IF abilityeffects > 0 BEGIN
 							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+								LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc firsteff = abilityeff1st effectnum = effectindex RET effdesc END
+								SPRINT newdesc ~%newdesc%~^~%effdesc%~
 							END
 						END
 					END	//近战能力
@@ -452,7 +462,11 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 					
 					PATCH_IF ((abilitytype == 3)&&(abilitylocation == 3)) BEGIN
 						SET addnum = addnum + 1
-						SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%＊物品能力资料补充：~
+						PATCH_IF abilityamount > 1 THEN BEGIN
+							SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%＊物品能力%itmability%资料补充：~
+						END ELSE BEGIN
+							SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%＊物品能力资料补充：~
+						END
 						PATCH_IF abilitytarget == 1 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－目标：活动生物~ END
 						PATCH_IF abilitytarget == 3 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－目标：活动生物（忽略距离）~ END
 						PATCH_IF abilitytarget == 4 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%－目标：有效距离内任意位置~ END
@@ -481,7 +495,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 						READ_SHORT (32 + abilityoffset + 0x38 * (itmability - 1)) abilityeff1st
 						PATCH_IF abilityeffects > 0 BEGIN
 							FOR (effectindex = 1 ; effectindex < (abilityeffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
-								LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = abilityeff1st effectnum = effectindex detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+								LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc firsteff = abilityeff1st effectnum = effectindex RET effdesc END
+								SPRINT newdesc ~%newdesc%~^~%effdesc%~
 							END
 						END
 					END	//物品能力
@@ -502,6 +517,33 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.itm$~ ~override~
 	//			END
 		PATCH_IF addnum > 0 BEGIN
 			SPRINT newdesc ~%newdesc%~^~%WNL%＿~	//添加终结符号便于判断
+			
+			//防止描述过长
+			PATCH_IF STRING_LENGTH ~%newdesc%~ > 10000 THEN BEGIN
+				INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN
+					REPLACE_TEXTUALLY ~失去能力或法术：\(.+\)〔.+〕~ ~失去能力或法术：\1~
+					REPLACE_TEXTUALLY ~学习法术：\(.+\)〔.+〕~ ~学习法术：\1~
+					REPLACE_TEXTUALLY ~获得能力或法术：\(.+\)〔.+〕~ ~获得能力或法术：\1~
+				END
+			END
+			PATCH_IF STRING_LENGTH ~%newdesc%~ > 10000 THEN BEGIN
+				INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN
+					REPLACE_TEXTUALLY ~防护法术：\(.+\)〔.+〕~ ~防护法术：\1~
+					REPLACE_TEXTUALLY ~反弹法术：\(.+\)〔.+〕~ ~反弹法术：\1~
+				END
+			END
+			PATCH_IF STRING_LENGTH ~%newdesc%~ > 10000 THEN BEGIN
+				INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN
+					REPLACE_TEXTUALLY ~(法术效果)\(.+\)〔.+〕~ ~(法术效果)\1~
+					REPLACE_TEXTUALLY ~时应用特定法术：\(.+\)〔.+〕~ ~时应用特定法术：\1~
+				END
+			END
+			PATCH_IF STRING_LENGTH ~%newdesc%~ > 10000 THEN BEGIN
+				INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN
+					REPLACE_TEXTUALLY ~施法：\(.+\)〔.+〕~ ~施法：\1~
+				END
+			END
+			
 			PATCH_IF keepstringref == 0 BEGIN
 				SAY_EVALUATED 0x54 ~%newdesc%~	//新增tlk条目
 			END ELSE BEGIN

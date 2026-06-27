@@ -9,7 +9,7 @@
 //	END
 //END
 COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
-//COPY_EXISTING ~SPCL941.SPL~ ~override~
+//COPY_EXISTING ~ohtmps2.SPL~ ~override~
 
 	PATCH_IF (SOURCE_SIZE > 0x72) BEGIN
 
@@ -70,7 +70,7 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 		
 		SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%＊法术基础特性补充描述：~
 		READ_BYTE 0x19 splflag2
-		PATCH_IF (splflag2 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%终止隐形和圣域~ END
+		PATCH_IF (splflag2 & 0b00000010) = 0b00000010 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%施展时终止隐形和圣域~ END
 		PATCH_IF (splflag2 & 0b00000100) = 0b00000100 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%引发敌对并显形~ END
 		PATCH_IF (splflag2 & 0b00001000) = 0b00001000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%无视野限制~ END
 		PATCH_IF (splflag2 & 0b00100000) = 0b00100000 BEGIN SPRINT newdesc ~%newdesc%~^~%WNL%限室外施展~ END
@@ -134,7 +134,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 		SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%＊施法时效果补充描述：~
 		PATCH_IF spleffects > 0  BEGIN
 			FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
-				LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = 0 effectnum = effectindex detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+				LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc firsteff = 0 effectnum = effectindex RET effdesc END
+				SPRINT newdesc ~%newdesc%~^~%effdesc%~
 			END
 		END
 		PATCH_IF NOT ~%newdesc%~ STRING_COMPARE ~%tempdesc%~ BEGIN	//STRING_COMPARE为0相等
@@ -176,7 +177,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 			READ_SHORT (30 + splabilityoffset) spleffects	//0x90
 			READ_SHORT (32 + splabilityoffset) spleff1st		//0x92
 			FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
-				LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = spleff1st effectnum = effectindex detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+				LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc firsteff = spleff1st effectnum = effectindex RET effdesc END
+				SPRINT newdesc ~%newdesc%~^~%effdesc%~
 			END
 		END ELSE BEGIN
 		
@@ -199,8 +201,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 			PATCH_IF spltargets > 1 BEGIN SPRINT newdesc ~%newdesc%~^~，目标数量：%spltargets%~ END
 			READ_SHORT (14 + splabilityoffset) splrange
 			SPRINT newdesc ~%newdesc%~^~，范围：%splrange%~
-			READ_SHORT (38 + splabilityoffset) splpro
-			LPF CHECK_PROJECTL INT_VAR projectlid = (splpro - 1) RET oproatt = projectlatt idsentry = projectldesc END
+			READ_SHORT (38 + splabilityoffset) splpro1
+			LPF CHECK_PROJECTL INT_VAR projectlid = (splpro1 - 1) RET oproatt = projectlatt idsentry = projectldesc END
 			SPRINT newdesc ~%newdesc%~^~%WNL%%idsentry%~
 			READ_SHORT (16 + splabilityoffset) splminlevel
 			SPRINT newdesc ~%newdesc%~^~%WNL%需求等级：%splminlevel%~
@@ -213,7 +215,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 	//PATCH_PRINT ~minspleffects=%spleffects%~
 	//PATCH_PRINT ~minspleff1st=%spleff1st%~
 			FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
-				LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = spleff1st effectnum = effectindex detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+				LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc firsteff = spleff1st effectnum = effectindex RET effdesc END
+				SPRINT newdesc ~%newdesc%~^~%effdesc%~
 			END
 			
 			SPRINT newdesc ~%newdesc%~^~%WNL%%WNL%＊法术最高等级效果补充描述：~
@@ -235,10 +238,14 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 			PATCH_IF spltargets > 1 BEGIN SPRINT newdesc ~%newdesc%~^~，目标数量：%spltargets%~ END
 			READ_SHORT (14 + splabilityoffset + 0x28 * (splabilities - 1)) splrange
 			SPRINT newdesc ~%newdesc%~^~，范围：%splrange%~
-			READ_SHORT (38 + splabilityoffset) splpro
-			LPF CHECK_PROJECTL INT_VAR projectlid = (splpro - 1) RET oproatt = projectlatt idsentry = projectldesc END
-			SPRINT newdesc ~%newdesc%~^~%WNL%%idsentry%~
-			READ_SHORT (16 + splabilityoffset) splminlevel
+			READ_SHORT (38 + splabilityoffset + 0x28 * (splabilities - 1)) splpro2
+			PATCH_IF splpro1 == splpro2 THEN BEGIN
+				SPRINT newdesc ~%newdesc%~^~%WNL%投射动画：同法术最低等级效果~
+			END ELSE BEGIN								
+				LPF CHECK_PROJECTL INT_VAR projectlid = (splpro2 - 1) RET oproatt = projectlatt idsentry = projectldesc END
+				SPRINT newdesc ~%newdesc%~^~%WNL%%idsentry%~
+			END
+			READ_SHORT (16 + splabilityoffset + 0x28 * (splabilities - 1)) splminlevel
 			SPRINT newdesc ~%newdesc%~^~%WNL%需求等级：%splminlevel%~
 			READ_SHORT (18 + splabilityoffset + 0x28 * (splabilities - 1)) splspeed
 			SPRINT newdesc ~%newdesc%~^~，施法时间：%splspeed%~
@@ -249,7 +256,8 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 	//PATCH_PRINT ~maxspleffects=%spleffects%~
 	//PATCH_PRINT ~maxspleff1st=%spleff1st%~
 			FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
-				LPF CHECK_ATTACK_EFFECT INT_VAR firsteff = spleff1st effectnum = effectindex detailed = detailed_desc STR_VAR pdesc = EVAL ~%newdesc%~ RET newdesc END
+				LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = detailed_desc firsteff = spleff1st effectnum = effectindex RET effdesc END
+				SPRINT newdesc ~%newdesc%~^~%effdesc%~
 			END
 		END
 		//PATCH_PRINT ~%newdesc%~
@@ -263,6 +271,32 @@ COPY_EXISTING_REGEXP GLOB ~^.+\.spl$~ ~override~
 	//					END
 	//				END
 	//			END
+	
+		//防止描述过长
+		PATCH_IF STRING_LENGTH ~%newdesc%~ > 10000 THEN BEGIN
+			INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN
+				REPLACE_TEXTUALLY ~失去能力或法术：\(.+\)〔.+〕~ ~失去能力或法术：\1~
+				REPLACE_TEXTUALLY ~学习法术：\(.+\)〔.+〕~ ~学习法术：\1~
+				REPLACE_TEXTUALLY ~获得能力或法术：\(.+\)〔.+〕~ ~获得能力或法术：\1~
+			END
+		END
+		PATCH_IF STRING_LENGTH ~%newdesc%~ > 10000 THEN BEGIN
+			INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN
+				REPLACE_TEXTUALLY ~防护法术：\(.+\)〔.+〕~ ~防护法术：\1~
+				REPLACE_TEXTUALLY ~反弹法术：\(.+\)〔.+〕~ ~反弹法术：\1~
+			END
+		END
+		PATCH_IF STRING_LENGTH ~%newdesc%~ > 10000 THEN BEGIN
+			INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN
+				REPLACE_TEXTUALLY ~(法术效果)\(.+\)〔.+〕~ ~(法术效果)\1~
+				REPLACE_TEXTUALLY ~时应用特定法术：\(.+\)〔.+〕~ ~时应用特定法术：\1~
+			END
+		END
+		PATCH_IF STRING_LENGTH ~%newdesc%~ > 10000 THEN BEGIN
+			INNER_PATCH_SAVE newdesc ~%newdesc%~ BEGIN
+				REPLACE_TEXTUALLY ~施法：\(.+\)〔.+〕~ ~施法：\1~
+			END
+		END
 
 		SPRINT newdesc ~%newdesc%~^~%WNL%＿~
 		PATCH_IF keepstringref == 0 BEGIN

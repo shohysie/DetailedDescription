@@ -1,0 +1,825 @@
+//其它功能函数，包括
+//SCRAMBLED_TEXT_NAMECHECK检测物品/生物/法术名称
+//CHECK_PROJECTL投射描述
+
+/* **************************************** */
+
+//输入物品/生物/法术文件名，文件不存在则给出“不存在的物品/生物/法术”，输入全为空则输出也是空
+
+DEFINE_PATCH_FUNCTION SCRAMBLED_TEXT_NAMECHECK
+INT_VAR
+	showname = 1	//为0仅名称（对应不进行详细说明）；为1名称+文件名（对应详细说明）；为2名称+文件名+法术极简说明，在调用CHECK_ITM_SPL_EFF_EFFECT时设置detailed = 3
+STR_VAR
+	itmcode = ~~
+	crecode = ~~
+	splcode = ~~
+RET
+	namestr
+BEGIN
+//STRING_CONTAINS_REGEXP结果是1表示不包含
+	//PATCH_PRINT ~code = %itmcode% %crecode% %splcode%~
+	//作为物品输入
+	PATCH_IF (STRING_LENGTH ~%itmcode%~ > 0) BEGIN
+		SET descdone = 0
+		PATCH_IF FILE_EXISTS_IN_GAME ~%itmcode%.itm~ BEGIN
+			INNER_ACTION BEGIN
+				COPY_EXISTING ~%itmcode%.itm~ ~override~
+					READ_LONG 0x0c nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN	//存在已鉴定名称
+						READ_STRREF 0x0c namestr
+						SET descdone = 1
+						PATCH_IF (NOT ~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)||(STRING_LENGTH ~%namestr%~ == 0) BEGIN	//已鉴定名称指向空文本
+							SPRINT namestr ~未知物品~
+						END ELSE BEGIN	//已鉴定名称不是空文本	
+							LPF CHECK_GARBLED_TEXT INT_VAR descindex = nameref RET notgarbled END
+							PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) BEGIN
+								PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文已鉴定名称乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
+输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
+								PATCH_READLN howtodo
+								WHILE NOT(IS_AN_INT %howtodo%) || (%howtodo% > 2) || (%howtodo% < 1) BEGIN
+									PATCH_PRINT ~请输入1或2。输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
+									PATCH_READLN howtodo
+								END
+								PATCH_IF (howtodo == 1) THEN BEGIN
+									PATCH_PRINT ~原名称已弃用，后继情况会自动保持此选项。~
+									SPRINT namestr ~物品已鉴定名称原本乱码~
+									SET descdone = 1
+									INNER_ACTION BEGIN COPY ~DetailedDescription/2da/SY#GARBL.2da~ ~override~ END
+								END ELSE BEGIN
+									PATCH_FAIL ~物品“%SOURCE_RES%.itm”已鉴定名称乱码，请检查，安装取消~
+								END
+							END ELSE BEGIN	//已鉴定名称正常（非空非乱码）或默认弃用乱码名称
+								SET descdone = 1
+								PATCH_IF (notgarbled == 2) THEN BEGIN
+									PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文已鉴定名称乱码情况，但不会导致游戏崩溃，已自动弃用原名称。~
+									SPRINT namestr ~物品已鉴定名称原本乱码~
+								END
+								PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) THEN BEGIN
+									PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文已鉴定名称乱码情况，已弃用原名称并继续安装（但不保证解决问题）。~
+									SPRINT namestr ~物品已鉴定名称原本乱码~
+								END 
+							END							
+						END
+					END
+					PATCH_IF descdone != 1 BEGIN	//没有已鉴定名称，找未鉴定名称
+						READ_LONG 0x08 nameref
+						PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN	//存在未鉴定名称
+							READ_STRREF 0x08 namestr
+							SET descdone = 1
+							PATCH_IF (NOT ~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)||(STRING_LENGTH ~%namestr%~ == 0) BEGIN	//未鉴定名称指向空文本
+								SPRINT namestr ~未知物品~
+							END ELSE BEGIN	//未鉴定名称不是空文本
+								LPF CHECK_GARBLED_TEXT INT_VAR descindex = nameref RET notgarbled END
+								PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) BEGIN
+									PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文未鉴定名称乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
+输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
+									PATCH_READLN howtodo
+									WHILE NOT(IS_AN_INT %howtodo%) || (%howtodo% > 2) || (%howtodo% < 1) BEGIN
+										PATCH_PRINT ~请输入1或2。输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
+										PATCH_READLN howtodo
+									END
+									PATCH_IF (howtodo == 1) THEN BEGIN
+										PATCH_PRINT ~原名称已弃用，后继情况会自动保持此选项。~
+										SPRINT namestr ~物品未鉴定名称原本乱码~
+										SET descdone = 1
+										INNER_ACTION BEGIN COPY ~DetailedDescription/2da/SY#GARBL.2da~ ~override~ END
+									END ELSE BEGIN
+										PATCH_FAIL ~物品“%SOURCE_RES%.itm”未鉴定名称乱码，请检查，安装取消~
+									END
+								END ELSE BEGIN	//未鉴定名称正常（非空非乱码）或默认弃用乱码名称
+									SET descdone = 1
+									PATCH_IF (notgarbled == 2) THEN BEGIN
+										PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文未鉴定名称乱码情况，但不会导致游戏崩溃，已自动弃用原名称。~
+										SPRINT namestr ~物品未鉴定名称原本乱码~
+									END 
+									PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) THEN BEGIN
+										PATCH_PRINT ~物品“%SOURCE_RES%.itm”存在中文未鉴定名称乱码情况，已弃用原名称并继续安装（但不保证解决问题）。~
+										SPRINT namestr ~物品未鉴定名称原本乱码~
+									END 
+								END
+							END
+						END
+					END
+				BUT_ONLY
+			END
+			PATCH_IF descdone != 1 BEGIN	//以上描述都没有，但物品确实存在
+				SPRINT namestr ~未知物品~
+				SET descdone = 1
+			END
+		END ELSE BEGIN	//代码存在但物品不存在
+			SPRINT namestr ~不存在的物品~
+		END
+		PATCH_IF showname > 0 BEGIN
+			SPRINT namestr ~%namestr%~^~(%itmcode%)~
+		END
+	END
+	//作为生物输入
+	PATCH_IF (STRING_LENGTH ~%crecode%~ > 0) BEGIN
+		SET descdone = 0
+		PATCH_IF FILE_EXISTS_IN_GAME ~%crecode%.cre~ BEGIN
+			INNER_ACTION BEGIN
+				COPY_EXISTING ~%crecode%.cre~ ~override~
+					READ_LONG 0x0c nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN	//存在短名称
+						READ_STRREF 0x0c namestr
+						SET descdone = 1
+						PATCH_IF (NOT ~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)||(STRING_LENGTH ~%namestr%~ == 0) BEGIN	//短名称指向空文本
+							SPRINT namestr ~未知生物~
+						END ELSE BEGIN	//已鉴定描述不是空文本
+							LPF CHECK_GARBLED_TEXT INT_VAR descindex = nameref RET notgarbled END
+							PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) BEGIN
+								PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文短名称乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
+输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
+								PATCH_READLN howtodo
+								WHILE NOT(IS_AN_INT %howtodo%) || (%howtodo% > 2) || (%howtodo% < 1) BEGIN
+									PATCH_PRINT ~请输入1或2。输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
+									PATCH_READLN howtodo
+								END
+								PATCH_IF (howtodo == 1) THEN BEGIN
+									PATCH_PRINT ~原名称已弃用，后继情况会自动保持此选项。~
+									SPRINT namestr ~生物短名称原本乱码~
+									SET descdone = 1
+									INNER_ACTION BEGIN COPY ~DetailedDescription/2da/SY#GARBL.2da~ ~override~ END
+								END ELSE BEGIN
+									PATCH_FAIL ~生物“%SOURCE_RES%.cre”短名称乱码，请检查，安装取消~
+								END
+							END ELSE BEGIN	//短名称正常（非空非乱码）或默认弃用乱码名称
+								SET descdone = 1
+								PATCH_IF (notgarbled == 2) THEN BEGIN
+									PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文短名称乱码情况，但不会导致游戏崩溃，已自动弃用原名称。~
+									SPRINT namestr ~生物短名称原本乱码~
+								END 
+								PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) THEN BEGIN
+									PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文短名称乱码情况，已弃用原名称并继续安装（但不保证解决问题）。~
+									SPRINT namestr ~生物短名称原本乱码~
+								END 
+							END
+						END
+					END
+					PATCH_IF descdone != 1 BEGIN	//没有短名称，找长名称
+						READ_LONG 0x08 nameref
+						PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN	//存在长名称
+							READ_STRREF 0x08 namestr
+							SET descdone = 1
+							PATCH_IF (NOT ~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)||(STRING_LENGTH ~%namestr%~ == 0) BEGIN	//长名称指向空文本
+								SPRINT namestr ~未知生物~
+							END ELSE BEGIN	//已鉴定描述不是空文本
+								LPF CHECK_GARBLED_TEXT INT_VAR descindex = nameref RET notgarbled END
+								PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) BEGIN
+									PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文长名称乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
+输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
+									PATCH_READLN howtodo
+									WHILE NOT(IS_AN_INT %howtodo%) || (%howtodo% > 2) || (%howtodo% < 1) BEGIN
+										PATCH_PRINT ~请输入1或2。输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
+										PATCH_READLN howtodo
+									END
+									PATCH_IF (howtodo == 1) THEN BEGIN
+										PATCH_PRINT ~原名称已弃用，后继情况会自动保持此选项。~
+										SPRINT namestr ~生物长名称原本乱码~
+										SET descdone = 1
+										INNER_ACTION BEGIN COPY ~DetailedDescription/2da/SY#GARBL.2da~ ~override~ END
+									END ELSE BEGIN
+										PATCH_FAIL ~生物“%SOURCE_RES%.cre”长名称乱码，请检查，安装取消~
+									END
+								END ELSE BEGIN	//长名称正常（非空非乱码）或默认弃用乱码名称
+									SET descdone = 1
+									PATCH_IF (notgarbled == 2) THEN BEGIN
+										PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文长名称乱码情况，但不会导致游戏崩溃，已自动弃用原名称。~
+										SPRINT namestr ~生物长名称原本乱码~
+									END 
+									PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) THEN BEGIN
+										PATCH_PRINT ~生物“%SOURCE_RES%.cre”存在中文长名称乱码情况，已弃用原名称并继续安装（但不保证解决问题）。~
+										SPRINT namestr ~生物长名称原本乱码~
+									END 
+								END
+							END
+						END
+					END
+				BUT_ONLY
+			END
+			PATCH_IF descdone != 1 BEGIN	//以上描述都没有，但生物确实存在
+				SPRINT namestr ~未知生物~
+				SET descdone = 1
+			END
+		END ELSE BEGIN	//代码存在但生物不存在
+			SPRINT namestr ~不存在的生物~
+		END
+		PATCH_IF showname > 0 BEGIN
+			SPRINT namestr ~%namestr%~^~(%crecode%)~
+		END
+	END
+	//作为法术输入
+	PATCH_IF (STRING_LENGTH ~%splcode%~ > 0) THEN BEGIN
+		SET descdone = 0
+		PATCH_IF FILE_EXISTS_IN_GAME ~%splcode%.spl~ THEN BEGIN
+			INNER_ACTION BEGIN
+				COPY_EXISTING ~%splcode%.spl~ ~override~
+					READ_LONG 0x08 nameref
+					PATCH_IF (nameref >= 0 && nameref < 2147483646) BEGIN	//存在法术名称
+						READ_STRREF 0x08 namestr
+						SET descdone = 1
+						PATCH_IF (NOT ~%namestr%~ STRING_CONTAINS_REGEXP ~Invalid Strref~)||(STRING_LENGTH ~%namestr%~ == 0) BEGIN	//法术名称指向空文本
+							SPRINT namestr ~未知法术~
+						END ELSE BEGIN	//已鉴定描述不是空文本
+					//PATCH_PRINT ~%nameref%:%namestr%~
+							LPF CHECK_GARBLED_TEXT INT_VAR descindex = nameref RET notgarbled END
+							PATCH_IF (notgarbled == 0)&&(NOT FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) BEGIN
+								PATCH_PRINT ~法术“%SOURCE_RES%.spl”存在中文名称乱码情况，请检查。继续安装可能在某些场景导致游戏崩溃（例如打开某些商店时）。		
+输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
+								PATCH_READLN howtodo
+								WHILE NOT(IS_AN_INT %howtodo%) || (%howtodo% > 2) || (%howtodo% < 1) BEGIN
+									PATCH_PRINT ~请输入1或2。输入1弃用原名称并继续安装（但不保证解决问题），输入2取消安装。~
+									PATCH_READLN howtodo
+								END
+								PATCH_IF (howtodo == 1) THEN BEGIN
+									PATCH_PRINT ~原名称已弃用，后继情况会自动保持此选项。~
+									SPRINT namestr ~法术名称原本乱码~
+									SET descdone = 1
+									INNER_ACTION BEGIN COPY ~DetailedDescription/2da/SY#GARBL.2da~ ~override~ END
+								END ELSE BEGIN
+									PATCH_FAIL ~法术“%SOURCE_RES%.spl”名称乱码，请检查，安装取消~
+								END
+							END ELSE BEGIN	//法术名称正常（非空非乱码）或默认弃用乱码名称
+								SET descdone = 1
+								PATCH_IF (notgarbled == 2) THEN BEGIN
+									PATCH_PRINT ~法术“%SOURCE_RES%.spl”存在中文名称乱码情况，但不会导致游戏崩溃，已自动弃用原名称。~
+									SPRINT namestr ~法术名称原本乱码~
+								END 
+								PATCH_IF (notgarbled == 0)&&(FILE_EXISTS_IN_GAME ~SY#GARBL.2da~) THEN BEGIN
+									PATCH_PRINT ~法术“%SOURCE_RES%.spl”存在中文名称乱码情况，已弃用原名称并继续安装（但不保证解决问题）。~
+									SPRINT namestr ~法术名称原本乱码~
+								END 
+							END
+						END
+					END
+				BUT_ONLY
+			END
+			PATCH_IF descdone != 1 BEGIN	//以上描述都没有，但法术确实存在
+				SPRINT namestr ~未知法术~
+				SET descdone = 1
+			END
+		END ELSE BEGIN	//代码存在但法术不存在
+			SPRINT namestr ~不存在的法术~
+		END
+		PATCH_IF showname > 0 BEGIN
+			SPRINT namestr ~%namestr%~^~(%splcode%)~
+		END
+
+		PATCH_IF (showname > 1)&&(FILE_EXISTS_IN_GAME ~%splcode%.spl~) BEGIN	//描述简化的法术效果
+			//如果法术为常见spl则不显示详细
+			SET donotdesc = 0
+			PATCH_IF NOT (~%splcode%~ STRING_CONTAINS_REGEXP ~SPPR~) THEN BEGIN	//法术是SPPR打头
+				SNPRINT (4 - STRING_LENGTH ~%splcode%~) tempcode ~%splcode%~	//去除SPPR
+				PATCH_IF IS_AN_INT tempcode THEN BEGIN	//剩下的如果是数字
+					SET tempcode = tempcode + 1000	//+1000为神术编号
+					LOOKUP_IDS_SYMBOL_OF_INT spellname ~spell~ tempcode	//查找该编号神术
+					PATCH_IF NOT IS_AN_INT spellname THEN BEGIN	//能找到（找不到会spellname=tempcode数字）
+						PATCH_IF NOT (~%spellname%~ STRING_MATCHES_REGEXP ~^\(CLERIC_\)~) THEN BEGIN	//找到的是CLERIC_开头的正常神术
+							SET donotdesc = 1	//标记该法术不需要进行描述
+						END
+					END
+				END
+			END
+			PATCH_IF NOT (~%splcode%~ STRING_CONTAINS_REGEXP ~^\(SPWI\|spwi\)~) THEN BEGIN	//法术是SPWI打头
+				SNPRINT (4 - STRING_LENGTH ~%splcode%~) tempcode ~%splcode%~	//去除SPWI
+				PATCH_IF IS_AN_INT tempcode THEN BEGIN	//剩下的如果是数字
+					SET tempcode = tempcode + 2000	//+2000为奥术编号
+					LOOKUP_IDS_SYMBOL_OF_INT spellname ~spell~ tempcode	//查找该编号奥术
+					PATCH_IF NOT IS_AN_INT spellname THEN BEGIN	//能找到（找不到会spellname=tempcode数字）
+						PATCH_IF NOT (~%spellname%~ STRING_MATCHES_REGEXP ~^\(WIZARD_\)~) THEN BEGIN	//找到的是WIZARD_开头的正常奥术
+							SET donotdesc = 1	//标记该法术不需要进行描述
+						END
+					END
+				END
+			END
+			PATCH_IF NOT (~%splcode%~ STRING_CONTAINS_REGEXP ~SPCL~) THEN BEGIN	//法术是SPCL打头
+				SNPRINT (4 - STRING_LENGTH ~%splcode%~) tempcode ~%splcode%~	//去除SPCL
+				PATCH_IF IS_AN_INT tempcode THEN BEGIN	//剩下的如果是数字
+					SET tempcode = tempcode + 4000	//+4000为特殊能力编号
+					LOOKUP_IDS_SYMBOL_OF_INT spellname ~spell~ tempcode	//查找该编号能力
+					PATCH_IF NOT IS_AN_INT spellname THEN BEGIN	//能找到（找不到会spellname=tempcode数字）
+						PATCH_IF (~%namestr%~ STRING_CONTAINS_REGEXP ~^\(未知法术\|不存在的法术\)~) THEN BEGIN //法术有正常名称
+							SET donotdesc = 1	//标记该法术不需要进行描述
+						END
+					END
+				END
+			END
+			PATCH_IF donotdesc == 0 THEN BEGIN
+				INNER_ACTION BEGIN
+					COPY_EXISTING ~%splcode%.spl~ ~override~
+						PATCH_IF (SOURCE_SIZE > 0x72) BEGIN
+							
+							SPRINT splmaindesc ~~
+							READ_LONG 0x34 spllevel
+							READ_SHORT 0x1C spltype
+							PATCH_IF (spllevel > 0) && (spltype == 1 || spltype == 2) THEN BEGIN
+								SPRINT splmaindesc ~%splmaindesc%~^~%spllevel%级~
+							END
+							PATCH_IF spltype == 1 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~奥术；~ END
+							PATCH_IF spltype == 2 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~神术；~ END
+							PATCH_IF spltype == 3 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~灵能；~ END
+							PATCH_IF spltype == 4 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~天生能力；~ END
+							PATCH_IF spltype == 5 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~战歌；~ END
+							READ_BYTE 0x19 splflag2
+							PATCH_IF (splflag2 & 0b00000010) = 0b00000010 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~施展时解除隐形；~ END
+							PATCH_IF (splflag2 & 0b00000100) = 0b00000100 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~引发敌对并显形；~ END
+							PATCH_IF (splflag2 & 0b00001000) = 0b00001000 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~无视野限制；~ END
+							PATCH_IF (splflag2 & 0b00100000) = 0b00100000 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~限室外施展；~ END
+							PATCH_IF (splflag2 & 0b01000000) = 0b01000000 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~无视狂乱波动和死魔法；~ END
+							PATCH_IF (splflag2 & 0b10000000) = 0b10000000 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~无视狂乱波动；~ END
+							READ_BYTE 0x1B splflag4
+							PATCH_IF (splflag4 & 0b00000001) = 0b00000001 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~可瞄准隐形对象；~ END
+							PATCH_IF (splflag4 & 0b00000010) = 0b00000010 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~沉默状态可施展；~ END
+							READ_BYTE 0x25 splschool
+							PATCH_IF splschool == 1 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~防护系；~ END
+							PATCH_IF splschool == 2 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~咒法系；~ END
+							PATCH_IF splschool == 3 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~预言系；~ END
+							PATCH_IF splschool == 4 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~附魔系；~ END
+							PATCH_IF splschool == 5 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~幻术系；~ END
+							PATCH_IF splschool == 6 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~塑能系；~ END
+							PATCH_IF splschool == 7 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~死灵系；~ END
+							PATCH_IF splschool == 8 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~改变系；~ END
+							PATCH_IF splschool == 10 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~野魔法；~ END
+							READ_BYTE 0x27 splsecond
+							PATCH_IF splsecond == 1 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~法术防护类；~ END
+							PATCH_IF splsecond == 2 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~特殊防护类；~ END
+							PATCH_IF splsecond == 3 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~幻术防护类；~ END
+							PATCH_IF splsecond == 4 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~破魔类；~ END
+							PATCH_IF splsecond == 5 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~破幻类；~ END
+							PATCH_IF splsecond == 6 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~咒法类；~ END
+							PATCH_IF splsecond == 7 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~战斗防护类；~ END
+							PATCH_IF splsecond == 8 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~意外类；~ END
+							PATCH_IF splsecond == 9 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~战场类；~ END
+							PATCH_IF splsecond == 10 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~攻击伤害类；~ END
+							PATCH_IF splsecond == 11 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~失能类；~ END
+							PATCH_IF splsecond == 12 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~综合类；~ END
+							PATCH_IF splsecond == 13 BEGIN SPRINT splmaindesc ~%splmaindesc%~^~非战斗类；~ END
+													
+							READ_SHORT 0x70 spleffects
+							PATCH_IF spleffects > 0 BEGIN
+								FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+									LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = 3 firsteff = 0 effectnum = effectindex RET effdesc END
+									PATCH_IF STRING_LENGTH ~%effdesc%~ > 0 THEN BEGIN
+										SPRINT splmaindesc ~%splmaindesc%~^~%effdesc%~
+									END
+								END
+							END
+
+							SPRINT splheaddesc ~~
+							READ_LONG 0x64 splabilityoffset	//0x72
+							READ_SHORT 0x68 splabilities	//20
+							PATCH_IF splabilities == 1 BEGIN
+								SPRINT tempdesc ~~
+								READ_BYTE (12 + splabilityoffset) spltarget
+								PATCH_IF spltarget == 4 BEGIN SPRINT tempdesc ~%tempdesc%~^~目标：范围；~ END
+								PATCH_IF spltarget == 5 BEGIN SPRINT tempdesc ~%tempdesc%~^~目标：施法者；~ END
+								PATCH_IF spltarget == 7 BEGIN SPRINT tempdesc ~%tempdesc%~^~目标：施法者（瞬发）；~ END
+								READ_SHORT (38 + splabilityoffset) splpro
+								LPF CHECK_PROJECTL INT_VAR projectlid = (splpro - 1) RET oproatt = projectlatt idsentry = projectldesc END
+								PATCH_IF oproatt > 1 BEGIN SPRINT tempdesc ~%tempdesc%~^~%idsentry%~ END						
+								READ_SHORT (30 + splabilityoffset) spleffects	//0x90
+								READ_SHORT (32 + splabilityoffset) spleff1st		//0x92
+								FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+									LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = 3 firsteff = spleff1st effectnum = effectindex RET effdesc END
+									SPRINT tempdesc ~%tempdesc%~^~%effdesc%~
+								END
+								PATCH_IF STRING_LENGTH ~%tempdesc%~ > 0 THEN BEGIN
+									SPRINT splheaddesc ~※法术效果：%tempdesc%~
+								END
+							END ELSE BEGIN
+								SPRINT tempdesc ~~
+								READ_BYTE (12 + splabilityoffset) spltarget
+								PATCH_IF spltarget == 4 BEGIN SPRINT tempdesc ~%tempdesc%~^~目标：范围；~ END
+								PATCH_IF spltarget == 5 BEGIN SPRINT tempdesc ~%tempdesc%~^~目标：施法者；~ END
+								PATCH_IF spltarget == 7 BEGIN SPRINT tempdesc ~%tempdesc%~^~目标：施法者（瞬发）；~ END
+								READ_SHORT (16 + splabilityoffset) splminlevel
+								SPRINT tempdesc ~%tempdesc%~^~需求等级：%splminlevel%；~
+								READ_SHORT (38 + splabilityoffset) splpro1
+								LPF CHECK_PROJECTL INT_VAR projectlid = (splpro1 - 1) RET oproatt = projectlatt idsentry = projectldesc END
+								PATCH_IF oproatt > 1 BEGIN SPRINT tempdesc ~%tempdesc%~^~%idsentry%；~ END
+								READ_SHORT (30 + splabilityoffset) spleffects	//0x90
+								READ_SHORT (32 + splabilityoffset) spleff1st		//0x92
+								FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+									LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = 3 firsteff = spleff1st effectnum = effectindex RET effdesc END
+									SPRINT tempdesc ~%tempdesc%~^~%effdesc%~
+								END
+								PATCH_IF STRING_LENGTH ~%tempdesc%~ > 0 THEN BEGIN
+									SPRINT splheaddesc ~※法术最低等级效果：%tempdesc%~
+								END
+								SPRINT tempdesc ~~
+								READ_BYTE (12 + splabilityoffset + 0x28 * (splabilities - 1)) spltarget
+								PATCH_IF spltarget == 4 BEGIN SPRINT tempdesc ~%tempdesc%~^~目标：范围；~ END
+								PATCH_IF spltarget == 5 BEGIN SPRINT tempdesc ~%tempdesc%~^~目标：施法者；~ END
+								PATCH_IF spltarget == 7 BEGIN SPRINT tempdesc ~%tempdesc%~^~目标：施法者（瞬发）；~ END
+								READ_SHORT (38 + splabilityoffset) splpro2
+								PATCH_IF splpro1 == splpro2 THEN BEGIN
+									SPRINT tempdesc ~%tempdesc%~^~投射动画同前；~
+								END ELSE BEGIN
+									LPF CHECK_PROJECTL INT_VAR projectlid = (splpro2 - 1) RET oproatt = projectlatt idsentry = projectldesc END
+									PATCH_IF oproatt > 1 BEGIN SPRINT tempdesc ~%tempdesc%~^~%idsentry%；~ END
+								END
+								READ_SHORT (16 + splabilityoffset + 0x28 * (splabilities - 1)) splminlevel
+								SPRINT tempdesc ~%tempdesc%~^~需求等级：%splminlevel%；~
+								READ_SHORT (30 + splabilityoffset + 0x28 * (splabilities - 1)) spleffects	//splabilities，# effects
+								READ_SHORT (32 + splabilityoffset + 0x28 * (splabilities - 1)) spleff1st		//第一个eff是总eff的第几个（从第0个开始）
+								FOR (effectindex = 1 ; effectindex < (spleffects + 1) ; ++effectindex) BEGIN	//遍历各个效果
+									LPF CHECK_ITM_SPL_EFF_EFFECT INT_VAR detailed = 3 firsteff = spleff1st effectnum = effectindex RET effdesc END
+									SPRINT tempdesc ~%tempdesc%~^~%effdesc%~
+								END
+								PATCH_IF STRING_LENGTH ~%tempdesc%~ > 0 THEN BEGIN
+									SPRINT splheaddesc ~%splheaddesc%~^~；※法术最高等级效果：%tempdesc%~
+								END
+							END	//法术文件头部
+							SPRINT splmaindesc ~%splmaindesc%~^~%splheaddesc%~
+							PATCH_IF STRING_LENGTH ~%splmaindesc%~ > 0 THEN BEGIN
+								INNER_PATCH_SAVE splmaindesc ~%splmaindesc%~ BEGIN
+									REPLACE_TEXTUALLY ~%WNL%+~ ~；~
+									REPLACE_TEXTUALLY ~无视狂乱波动和死魔法；无视狂乱波动；~ ~无视狂乱波动和死魔法；~
+									REPLACE_TEXTUALLY ~目标：自身\(，[^；%WNL%]+\)，无视魔抗和驱散，无视豁免；~ ~目标：自身\1；~
+									REPLACE_TEXTUALLY ~目标：自身\(，[^；%WNL%]+\)，无视魔抗但可驱散，无视豁免；~ ~目标：自身\1，可驱散；~
+								END
+								INNER_PATCH_SAVE splmaindesc ~%splmaindesc%~ BEGIN
+									REPLACE_TEXTUALLY ~，，~ ~，~
+									REPLACE_TEXTUALLY ~，；~ ~；~
+									REPLACE_TEXTUALLY ~；；~ ~；~
+									REPLACE_TEXTUALLY ~－~ ~~
+									REPLACE_TEXTUALLY ~目标：自身，无视魔抗和驱散，无视豁免；~ ~目标：自身；~
+								END
+								SPRINT namestr ~%namestr%~^~〔%splmaindesc%〕~
+							END
+							
+						END	//正常size
+					BUT_ONLY	//法术文件读取
+				
+				END	//INNER_ACTION
+			END	//描述简化的法术效果
+		END
+	END
+	
+	//所有代码为空
+	PATCH_IF (STRING_LENGTH ~%itmcode%~ == 0)&&(STRING_LENGTH ~%crecode%~ == 0)&&(STRING_LENGTH ~%splcode%~ == 0) BEGIN
+		SPRINT namestr ~~
+	END
+
+//PATCH_PRINT ~namestr = %namestr%~
+END
+
+
+
+
+
+/* **************************************** */
+
+
+//输入投射的id或文件名，输出描述。id>0且和文件名同时存在则id优先
+//在物品/法术中0为Default、1为None、2为Arrow;在MISSILE.ids中1为None、2为Arrow;而PROJECTL.ids中1为Arrow
+//在pro中读取第二投射物和爆炸投射物，第二投射物中0为None、1为Arrow，爆炸投射物中0为Default、1为None、2为Arrow
+//本函数输入的id适配PROJECTL.ids和第二投射物，即1为Arrow;需要适配物品/法术、MISSILE.ids、爆炸投射物必须先-1，爆炸投射物是0的话需要等同于1
+//如果输入projectlid >0，以projectlid为准，无视输入的projectlcode
+//如果输入projectlid <1，若projectlcode存在则以projectlcode为准，无视输入的projectlid
+
+DEFINE_ACTION_FUNCTION CHECK_PROJECTL
+INT_VAR
+	projectlid = 0
+STR_VAR
+	projectlcode = ~~	//投射文件名称 调用函数时输入字符串的格式要用STR_VAR projectlcode = EVAL ~%xxxxx%~
+RET
+	projectlatt	//0不正常，1单体，2反弹+穿过，3线形，4穿过目标直线飞行，5圆形范围，6锥形范围，7矩形范围，8范围调用第二投射，9射线
+	projectldesc
+BEGIN
+	OUTER_SET tempprojectlatt = 0
+	OUTER_SPRINT tempprojectldesc ~~
+	OUTER_SPRINT projectlname ~~
+	//首先排除无投射单体，projectlid =0/-1且未输入projectlcode
+	ACTION_IF ((projectlid == 0)||(projectlid == "-1")) && (STRING_LENGTH ~%projectlcode%~ == 0) THEN BEGIN	//输入投射编号为-1或者0且未输入投射名称
+		OUTER_SET tempprojectlatt = 1
+		OUTER_SPRINT tempprojectldesc ~投射动画：无动画单体效果~
+	END ELSE BEGIN
+		//projectlid >0，以projectlid为准在MISSILE.ids找projectlcode
+		ACTION_IF projectlid > 0 THEN BEGIN
+			COPY_EXISTING ~MISSILE.ids~ ~override~
+				LOOKUP_IDS_SYMBOL_OF_INT projectlname ~MISSILE~ (projectlid + 1)	//MISSILE.ids中存放的pro名称，可能比较长，不是文件名
+				LOOKUP_IDS_SYMBOL_OF_INT projectlcode ~PROJECTL~ projectlid			//PROJECTL.ids中的pro代码，硬编码的pro没有代码所以可能找不到
+			BUT_ONLY
+			ACTION_IF (IS_AN_INT %projectlname%)&&(IS_AN_INT %projectlcode%) THEN BEGIN	//注：LOOKUP_IDS_SYMBOL_OF_INT如果ids没有对应编号则输出结果等于输入编号
+				OUTER_SPRINT tempprojectldesc ~投射动画编号超出范围~
+			END
+			ACTION_IF (NOT IS_AN_INT %projectlname%)&&(NOT FILE_EXISTS_IN_GAME ~%projectlcode%.pro~) THEN BEGIN	//MISSILE.ids里存在但没有文件存在
+				OUTER_SPRINT tempprojectldesc ~投射动画：%projectlname%【硬编码无法读取】~
+			END
+		END ELSE BEGIN	//projectlid <1，看projectlcode有没有输入
+			ACTION_IF (STRING_LENGTH ~%projectlcode%~ == 0) THEN BEGIN	//输入projectlid不对劲，也没输入projectlcode。projectlid =0/-1且未输入projectlcode为无投射单体前面已经判断过
+				OUTER_SPRINT tempprojectldesc ~投射动画：不正常的动画~
+			END ELSE BEGIN
+				ACTION_IF NOT FILE_EXISTS_IN_GAME ~%projectlcode%.pro~ THEN BEGIN	//输入projectlid不对劲，输入的projectlcode也没对应文件
+					OUTER_SPRINT tempprojectldesc ~投射动画：不正常的动画~
+				END
+			END
+		END
+	END
+
+/*
+	ACTION_IF ((projectlid == 0)||(projectlid == "-1")) && (STRING_LENGTH ~%projectlcode%~ == 0) THEN BEGIN	//输入投射编号为-1或者0且未输入投射名称
+		OUTER_SET tempprojectlatt = 1
+		OUTER_SPRINT tempprojectldesc ~投射动画：无动画单体效果~
+	END
+	ACTION_IF projectlid < "-1" THEN BEGIN
+		OUTER_SET tempprojectlatt = 0
+		OUTER_SPRINT tempprojectldesc ~投射动画：不正常的动画~
+	END
+
+	ACTION_IF projectlid > 0 THEN BEGIN	//id>0则对应的pro代码覆盖输入的projectlcode
+		COPY_EXISTING ~MISSILE.ids~ ~override~
+			LOOKUP_IDS_SYMBOL_OF_INT projectlname ~MISSILE~ (projectlid + 1)	//MISSILE.ids中存放的pro名称
+			LOOKUP_IDS_SYMBOL_OF_INT projectlcode ~PROJECTL~ projectlid			//PROJECTL.ids中的pro代码，硬编码的pro没有代码
+		BUT_ONLY	//注：LOOKUP_IDS_SYMBOL_OF_INT如果ids没有对应编号则输出结果等于输入编号
+		ACTION_IF (IS_AN_INT %projectlname%)&&(IS_AN_INT %projectlcode%) THEN BEGIN
+			OUTER_SET tempprojectlatt = 0
+			OUTER_SPRINT tempprojectldesc ~投射动画编号超出范围~
+		END
+	END
+
+	ACTION_IF (STRING_LENGTH ~%projectlname%~ > 0) && (NOT IS_AN_INT %projectlname%) THEN BEGIN	//找到了pro名称
+		OUTER_SPRINT tempprojectldesc ~%tempprojectldesc%~^~投射动画：%projectlname%~
+	END
+//PRINT ~projectlid=%projectlid% projectlname=%projectlname% projectlcode=%projectlcode% tempprojectldesc=%tempprojectldesc%~
+*/
+	ACTION_IF (STRING_LENGTH ~%projectlcode%~ > 0)&&(NOT IS_AN_INT %projectlcode%)&&(STRING_LENGTH ~%tempprojectldesc%~ == 0) THEN BEGIN	//找到了正常的pro代码且没有特殊情况
+		OUTER_SPRINT tempprojectldesc ~投射动画：%projectlname%(%projectlcode%.pro)【~
+		ACTION_IF FILE_EXISTS_IN_GAME ~%projectlcode%.pro~ THEN BEGIN
+			COPY_EXISTING ~%projectlcode%.pro~ ~override~
+				READ_SHORT 0x08 protype
+				PATCH_MATCH protype
+				WITH
+					0 BEGIN SPRINT tempprojectldesc ~%tempprojectldesc%~^~无投射物，瞬间命中~ END
+					1 BEGIN SPRINT tempprojectldesc ~%tempprojectldesc%~^~无投射物，永不命中~ END
+					2 BEGIN SET tempprojectlatt = 1 END
+					3 BEGIN SET tempprojectlatt = 5
+						READ_SHORT 0x214 prosecpro	//第二投射物的编号本身-1，不需要再减（0为None，1为Arrow）
+						PATCH_IF prosecpro > 0 THEN BEGIN
+							LPF CHECK_PROJECTL INT_VAR projectlid = prosecpro RET prosecatt = projectlatt prosecdesc = projectldesc END
+						END
+						PATCH_IF prosecpro == 0 THEN BEGIN
+							SET prosecatt = 1 SPRINT prosecdesc ~无动画单体效果~
+						END
+						READ_SHORT 0x21a proexpro	//爆炸投射物（0为Default，1为None，2为Arrow）
+						PATCH_IF proexpro > 1 THEN BEGIN
+							LPF CHECK_PROJECTL INT_VAR projectlid = (proexpro - 1) RET proexpatt = projectlatt proexpdesc = projectldesc END
+						END
+						PATCH_IF (proexpro == 0)||(proexpro == 1) THEN BEGIN
+							SET proexpatt = 1 SPRINT proexpdesc ~无动画单体效果~
+						END
+					END
+					DEFAULT SPRINT tempprojectldesc ~%tempprojectldesc%~^~错误的投射类型~
+				END
+				PATCH_IF (protype == 2)||(protype == 3) THEN BEGIN
+					READ_SHORT 0x0a prospeed
+					READ_SHORT 0x2a prowidth
+					READ_BYTE 0x2c probehav1
+					READ_BYTE 0x2d probehav2
+					READ_BYTE 0x2e probehav3
+					READ_BYTE 0x2f probehav4
+					PATCH_IF ((probehav1 & 0b00001000) == 0b00001000) THEN BEGIN	//立即命中
+						SPRINT tempprojectldesc ~%tempprojectldesc%~^~投射物立刻命中~
+					END ELSE BEGIN
+						PATCH_IF (probehav2 & 0b00100000) == 0b00100000 THEN BEGIN	//彗星
+							SPRINT tempprojectldesc ~%tempprojectldesc%~^~投射物彗星状下落~
+						END ELSE BEGIN
+							SPRINT tempprojectldesc ~%tempprojectldesc%~^~投射物飞行速度%prospeed%像素/帧~
+						END
+					END
+					PATCH_IF (probehav1 & 0b00000001) == 0b00000001 THEN BEGIN	//反弹，可能是单体或范围，必然有范围效果
+						PATCH_IF ((probehav1 & 0b00000010) == 0b00000010)&&(protype == 2) THEN BEGIN	//穿过目标，并且自身为单体目标，实际上是范围效果
+							SPRINT tempprojectldesc ~%tempprojectldesc%~^~，从墙壁反弹四次~
+							SET tempprojectlatt = 2	//反弹+穿过
+						END
+						PATCH_IF protype == 3 THEN BEGIN	//激活第二投射【第二投射唯一存在实际效果的情况】，并且自身为范围目标
+							READ_BYTE 0x200 proareaflag1
+							PATCH_IF (proareaflag1 & 0b00010000) == 0b00010000  THEN BEGIN	//激活第二投射
+								PATCH_IF prosecatt > 0 THEN BEGIN	//正常的第二投射物
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，从目标发出子投射物[子%prosecdesc%]~
+									READ_BYTE 0x201 proareaflag2
+									PATCH_IF (proareaflag2 & 0b00001000) == 0b00001000  THEN BEGIN	//锥形
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，瞄准施法者方向~
+									END ELSE BEGIN
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，方向随机~
+									END
+									PATCH_IF (probehav4 & 0b00100000) == 0b00100000 THEN BEGIN	//有限路径计数
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，飞行%proexplofreq%帧~
+									END
+									SET tempprojectlatt = 8	//范围调用第二投射
+								END
+							END
+						END
+					END
+					PATCH_IF ((probehav1 & 0b00000010) == 0b00000010)&&((probehav2 & 0b00010000) != 0b00010000)&&((probehav2 & 0b00100000) != 0b00100000) THEN BEGIN	//穿过目标直线飞行，不能是下落路径或彗星，可能是单体或范围属性，但必然会造成范围效果
+						SET prolinetemp = 0
+						PATCH_IF protype == 3 THEN BEGIN	//如果是范围，检测是否有锥形标志
+							READ_BYTE 0x201 proareaflag2
+							PATCH_IF (proareaflag2 & 0b00001000) != 0b00001000 THEN BEGIN	//不是锥形
+								SET prolinetemp = 1
+							END
+						END
+						PATCH_IF (protype == 2) || (prolinetemp == 1) THEN BEGIN	//如果单体则OK，如果范围不能是锥形
+							PATCH_IF (probehav1 & 0b00001000) != 0b00001000 THEN BEGIN	//非立即命中
+								PATCH_IF prowidth == 0 THEN BEGIN
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，直线飞行，影响途经生物~
+								END ELSE BEGIN
+									SET prowidth = prowidth + 2
+									SET prowidthin = prowidth * 10 / 85
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，直线飞行，效果半径%prowidth%像素(约%prowidthin%呎)~
+								END
+							END
+							PATCH_IF (probehav4 & 0b00100000) == 0b00100000 THEN BEGIN	//有限路径计数
+								SPRINT tempprojectldesc ~%tempprojectldesc%~^~，飞行到目标位置~
+							END ELSE BEGIN
+								SPRINT tempprojectldesc ~%tempprojectldesc%~^~，飞行到地图边缘~
+							END
+							SET tempprojectlatt = 4 //穿过目标直线飞行
+						END
+					END
+					PATCH_IF protype == 2 THEN BEGIN	//单体目标，配合线形，必然有范围效果
+						PATCH_IF (probehav2 & 0b01000000) == 0b01000000 THEN BEGIN	//线形
+							PATCH_IF NOT (((probehav1 & 0b10000000) == 0b10000000)||((probehav2 & 0b00000100) == 0b00000100)) THEN BEGIN	//不能是柱状或多重投射物
+								SPRINT tempprojectldesc ~%tempprojectldesc%~^~，在施法者和目标之间拉出线条，有效宽度52像素(约6呎)~
+								PATCH_IF (probehav4 & 0b00100000) == 0b00100000 THEN BEGIN	//有限路径计数
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，仅生效一次~
+								END ELSE BEGIN
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，4秒后再次生效~
+								END
+							END
+							SET tempprojectlatt = 3	//线形
+						END ELSE BEGIN
+							PATCH_IF tempprojectlatt == 1 BEGIN SPRINT tempprojectldesc ~%tempprojectldesc%~^~，目标为单体~ END
+						END
+					END ELSE BEGIN	//protype == 3爆炸范围效果
+						READ_BYTE 0x200 proareaflag1
+						READ_BYTE 0x201 proareaflag2
+						READ_SHORT 0x202 prorays
+						READ_SHORT 0x204 protrapsize
+						SET protrapsizein = (protrapsize * 10 / 85)
+						READ_SHORT 0x206 proexplosize
+						SET proexplosizein = (proexplosize * 10 / 85)
+						READ_SHORT 0x210 proexplofreq
+						READ_BYTE 0x216 prorepet
+						READ_BYTE 0x21a proexpro
+						READ_SHORT 0x224 proconewidth
+						READ_BYTE 0x240 proextendflag1
+						READ_BYTE 0x241 proextendflag2
+						PATCH_IF prorays > 0 THEN BEGIN	//射线，必须要存在爆炸投射物
+//PATCH_PRINT ~射线爆炸投射物prorays=%prorays%,proexpatt=%proexpatt%~
+							PATCH_IF proexpatt > 3 THEN BEGIN	//射线调用的必须是穿过目标或范围效果才有实际作用
+								PATCH_IF (proareaflag2 & 0b00001000) == 0b00001000  THEN BEGIN	//锥形，影响射线的触发位置
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，命中时以施法者为中心发出%prorays%条子投射物（第一条往目标方向发射）[子%proexpdesc%]~
+								END ELSE BEGIN
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，命中时以目标为中心发出%prorays%条子投射物（第一条延续主投射物飞行方向）[子%proexpdesc%]~
+								END
+							END
+							SET tempprojectlatt = 9	//射线
+						END ELSE BEGIN	//非射线
+							PATCH_IF (proareaflag1 & 0b00000100) == 0b00000100 THEN BEGIN	//条件触发
+								SPRINT tempprojectldesc ~%tempprojectldesc%~^~，设置触发陷阱~
+							END ELSE BEGIN
+								SPRINT tempprojectldesc ~%tempprojectldesc%~^~，击中触发范围效果~
+							END
+							PATCH_IF ((probehav2 & 0b10000000) == 0b10000000)&&((probehav1 & 0b00000010) != 0b00000010) THEN BEGIN	//矩形，并且没有穿过目标
+								PATCH_IF (proareaflag1 & 0b00001000) == 0b00001000 THEN BEGIN	//延迟触发，这种情况下是正常触发次数和时间间隔
+									PATCH_IF (proareaflag2 & 0b00000001) == 0b00000001 THEN BEGIN
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，法师等级决定重复次数，间隔%proexplofreq%帧~
+									END
+									PATCH_IF (proareaflag2 & 0b00000010) == 0b00000010 THEN BEGIN
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，牧师等级决定重复次数，间隔%proexplofreq%帧~
+									END
+									PATCH_IF NOT (((proareaflag2 & 0b00000001) == 0b00000001)||((proareaflag2 & 0b00000010) == 0b00000010)) THEN BEGIN
+										PATCH_IF prorepet > 1 THEN BEGIN
+											SPRINT tempprojectldesc ~%tempprojectldesc%~^~，重复%prorepet%次，间隔%proexplofreq%帧~
+										END
+									END
+								END ELSE BEGIN
+									PATCH_IF prorepet < 2 THEN BEGIN
+										PATCH_IF (proareaflag2 & 0b01000000) == 0b01000000 THEN BEGIN	//跳过首次条件
+											SET prorepet = proexplofreq + 1
+										END ELSE BEGIN
+											SET prorepet = 1
+										END
+									END ELSE BEGIN
+										PATCH_IF (proareaflag2 & 0b01000000) == 0b01000000 THEN BEGIN	//跳过首次条件
+											SET prorepet = (proexplofreq + 1) * prorepet
+										END ELSE BEGIN
+											SET prorepet = (proexplofreq + 1) * (prorepet - 1) + 1
+										END
+									END
+									PATCH_IF prorepet > 1 THEN BEGIN
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，每帧触发，重复%prorepet%次~
+									END
+								END
+								SPRINT tempprojectldesc ~%tempprojectldesc%~^~，爆炸影响%protrapsize%像素(约%protrapsizein%呎)×%proexplosize%像素(约%proexplosizein%呎)矩形~
+								PATCH_IF proexpatt > 0 THEN BEGIN
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，对范围内目标发出子投射物[子%proexpdesc%]~
+								END
+								SET tempprojectlatt = 7	//矩形
+							END ELSE BEGIN	//非矩形，或者穿过目标
+								PATCH_IF (proareaflag1 & 0b00001000) == 0b00001000 THEN BEGIN	//延迟触发
+									PATCH_IF (proareaflag2 & 0b01000000) == 0b01000000 THEN BEGIN	//跳过首次条件
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，延迟%proexplofreq%帧触发~
+									END
+									PATCH_IF (proareaflag1 & 0b00000100) == 0b00000100 THEN BEGIN	//条件触发
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，第二次触发才起效~
+									END
+								END ELSE BEGIN
+									PATCH_IF (proareaflag2 & 0b01000000) == 0b01000000 THEN BEGIN	//跳过首次条件
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，第二次触发才起效~
+									END
+								END
+								PATCH_IF (proareaflag2 & 0b00000001) == 0b00000001 THEN BEGIN
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，法师等级决定重复次数，间隔%proexplofreq%帧~
+								END
+								PATCH_IF (proareaflag2 & 0b00000010) == 0b00000010 THEN BEGIN
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，牧师等级决定重复次数，间隔%proexplofreq%帧~
+								END
+								PATCH_IF NOT (((proareaflag2 & 0b00000001) == 0b00000001)||((proareaflag2 & 0b00000010) == 0b00000010)) THEN BEGIN
+									PATCH_IF prorepet > 1 THEN BEGIN
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，重复%prorepet%次，间隔%proexplofreq%帧~
+									END
+								END
+								PATCH_IF (proareaflag1 & 0b00000100) == 0b00000100 THEN BEGIN	//陷阱
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，触发半径%protrapsize%像素(约%protrapsizein%呎)~
+								END
+								SPRINT tempprojectldesc ~%tempprojectldesc%~^~，效果半径%proexplosize%像素(约%proexplosizein%呎)~
+								SET tempprojectlatt = 5	//圆形
+								PATCH_IF (proareaflag2 & 0b00001000) == 0b00001000  THEN BEGIN	//锥形
+									PATCH_IF ((probehav1 & 0b00001000) == 0b00001000)||((probehav2 & 0b00010000) == 0b00010000) THEN BEGIN	//立即命中，或者下落路径
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，%proconewidth%°锥形（从目标发出）~
+									END ELSE BEGIN
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，%proconewidth%°锥形（从施法者发出）~
+									END
+									SET tempprojectlatt = 6	//锥形
+								END
+								PATCH_IF proexpatt > 0 THEN BEGIN
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，对范围内目标发出子投射物[子%proexpdesc%]~
+								END
+							END
+							PATCH_IF (proareaflag1 & 0b01000000) == 0b01000000 THEN BEGIN
+								PATCH_IF (proareaflag1 & 0b10000000) == 0b10000000 THEN BEGIN
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，仅影响盟友~
+								END ELSE BEGIN
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，仅影响敌人~
+								END
+							END
+							READ_BYTE 0x0c probehav
+							PATCH_IF (probehav & 0b00010000) == 0b00010000 THEN BEGIN
+								SPRINT tempprojectldesc ~%tempprojectldesc%~^~，忽略直接目标~
+							END
+							PATCH_IF (proareaflag2 & 0b00010000) == 0b00010000 THEN BEGIN	//忽略LOS
+								SPRINT tempprojectldesc ~%tempprojectldesc%~^~，无视障碍物~
+							END
+							PATCH_IF (proareaflag2 & 0b10000000) == 0b10000000 THEN BEGIN	//单一目标打上勾
+								READ_SHORT 0x244 promultitargetdices
+								READ_SHORT 0x246 promultitargetdicesize
+								PATCH_IF (proextendflag2 & 0b10000000) == 0b10000000 THEN BEGIN	//命中HP限制
+									PATCH_IF promultitargetdices > 0 THEN BEGIN
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，仅影响当前生命值总和不超过%promultitargetdices%的目标总数~
+									END
+									PATCH_IF promultitargetdicesize > 0 THEN BEGIN
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，仅影响当前生命值不超过%promultitargetdicesize%的目标~
+									END
+								END
+								PATCH_IF (proextendflag2 & 0b00000100) == 0b00000100 THEN BEGIN	//使用HD查找
+									PATCH_IF (promultitargetdices > 0)&&(promultitargetdicesize > 0) THEN BEGIN
+										SPRINT tempprojectldesc ~%tempprojectldesc%~^~，仅影响等级不大于%promultitargetdices%D%promultitargetdicesize%的目标~
+									END
+								END
+								PATCH_IF ((proextendflag2 & 0b10000000) != 0b10000000)&&((promultitargetdices == 0)||(promultitargetdicesize == 0)) THEN BEGIN
+									SPRINT tempprojectldesc ~%tempprojectldesc%~^~，仅影响最近的单个目标~
+								END
+							END
+						END	//非射线
+					END	//范围效果
+				END	//单体或范围正常pro
+			BUT_ONLY
+		END	//存在pro文件
+		OUTER_SPRINT tempprojectldesc ~%tempprojectldesc%~^~】~
+	END
+	OUTER_SPRINT projectldesc ~%tempprojectldesc%~
+	OUTER_SET projectlatt = tempprojectlatt
+//PRINT ~%projectlatt%-%projectldesc%~
+END
+
+
+DEFINE_PATCH_FUNCTION CHECK_PROJECTL
+INT_VAR
+	projectlid = 0
+STR_VAR
+	projectlcode = ~~
+RET
+	projectlatt	//0不正常，1单体，2反弹+穿过，3线形，4穿过目标直线飞行，5圆形范围，6锥形范围，7矩形范围，8范围调用第二投射，9射线
+	projectldesc
+BEGIN
+	INNER_ACTION BEGIN
+		LAF CHECK_PROJECTL INT_VAR projectlid = projectlid STR_VAR projectlcode = EVAL ~%projectlcode%~ RET projectlatt projectldesc END
+	END
+END
+
+
+
+
