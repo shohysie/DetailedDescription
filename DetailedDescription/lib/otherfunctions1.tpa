@@ -339,7 +339,7 @@ BEGIN
 						PATCH_IF splschool == 5 BEGIN SPRINT tempdesc ~%tempdesc%~^~幻术系；~ END
 						PATCH_IF splschool == 6 BEGIN SPRINT tempdesc ~%tempdesc%~^~塑能系；~ END
 						PATCH_IF splschool == 7 BEGIN SPRINT tempdesc ~%tempdesc%~^~死灵系；~ END
-						PATCH_IF splschool == 8 BEGIN SPRINT tempdesc ~%tempdesc%~^~改变系；~ END
+						PATCH_IF splschool == 8 BEGIN SPRINT tempdesc ~%tempdesc%~^~变化系；~ END
 						PATCH_IF splschool == 10 BEGIN SPRINT tempdesc ~%tempdesc%~^~野魔法；~ END
 						READ_BYTE 0x27 splsecond
 						PATCH_IF splsecond == 1 BEGIN SPRINT tempdesc ~%tempdesc%~^~法术防护类；~ END

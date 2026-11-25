@@ -1734,7 +1734,7 @@ BEGIN
 		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：幻术系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：塑能系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：死灵系~ SET descfixed = 1 END
-		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：改变系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：变化系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：全部~ SET descfixed = 1 END
 		PATCH_IF (descfixed == 1) BEGIN
 			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
@@ -1768,7 +1768,7 @@ BEGIN
 		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：幻术系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：塑能系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：死灵系~ SET descfixed = 1 END
-		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：改变系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：变化系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~防护学派：全部~ SET descfixed = 1 END
 		PATCH_IF (descfixed == 1) BEGIN
 			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
@@ -1903,7 +1903,7 @@ BEGIN
 		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：幻术系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：塑能系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：死灵系~ SET descfixed = 1 END
-		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：改变系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：变化系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~移除学派：全部~ SET descfixed = 1 END
 		PATCH_IF (descfixed == 1) BEGIN
 			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
@@ -1943,7 +1943,7 @@ BEGIN
 		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：幻术系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：塑能系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：死灵系~ SET descfixed = 1 END
-		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：改变系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：变化系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~吸收学派：全部~ SET descfixed = 1 END
 		PATCH_IF (descfixed == 1) BEGIN
 			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，总共吸收%readamount%次~ SET descfixed = 1 END
@@ -1983,7 +1983,7 @@ BEGIN
 		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：幻术系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：塑能系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：死灵系~ SET descfixed = 1 END
-		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：改变系~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：变化系~ SET descfixed = 1 END
 		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~反弹学派：全部~ SET descfixed = 1 END
 		PATCH_IF (descfixed == 1) BEGIN
 			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，总共反弹%readamount%次~ SET descfixed = 1 END
@@ -2018,7 +2018,7 @@ BEGIN
 		PATCH_IF (readtype == 5) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个幻术系法术的效果~ SET descfixed = 1 END
 		PATCH_IF (readtype == 6) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个塑能系法术的效果~ SET descfixed = 1 END
 		PATCH_IF (readtype == 7) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个死灵系法术的效果~ SET descfixed = 1 END
-		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个改变系法术的效果~ SET descfixed = 1 END
+		PATCH_IF (readtype == 8) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个变化系法术的效果~ SET descfixed = 1 END
 		PATCH_IF (readtype == 9) BEGIN SPRINT effdesc ~%effdesc%~^~移除一个任意学派法术的效果~ SET descfixed = 1 END
 		PATCH_IF (descfixed == 1) BEGIN
 			PATCH_IF readamount > 0  BEGIN SPRINT effdesc ~%effdesc%~^~，最高法术等级%readamount%~ SET descfixed = 1 END
@@ -3056,7 +3056,7 @@ BEGIN
 		PATCH_IF (readspecial == 5) BEGIN SPRINT effdesc ~%effdesc%~^~对幻术系~ SET descfixed = 1 END
 		PATCH_IF (readspecial == 6) BEGIN SPRINT effdesc ~%effdesc%~^~对塑能系~ SET descfixed = 1 END
 		PATCH_IF (readspecial == 7) BEGIN SPRINT effdesc ~%effdesc%~^~对死灵系~ SET descfixed = 1 END
-		PATCH_IF (readspecial == 8) BEGIN SPRINT effdesc ~%effdesc%~^~对改变系~ SET descfixed = 1 END
+		PATCH_IF (readspecial == 8) BEGIN SPRINT effdesc ~%effdesc%~^~对变化系~ SET descfixed = 1 END
 		PATCH_IF (readspecial == 9) BEGIN SPRINT effdesc ~%effdesc%~^~对所有系~ SET descfixed = 1 END
 		PATCH_IF (readspecial == 10) BEGIN SPRINT effdesc ~%effdesc%~^~对狂乱系~ SET descfixed = 1 END
 		PATCH_IF (descfixed == 1) BEGIN
