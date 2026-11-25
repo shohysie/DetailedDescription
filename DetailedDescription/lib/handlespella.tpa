@@ -112,7 +112,7 @@ COPY_EXISTING ~SPELL.ids~ ~override~
 							PATCH_IF splschool == 5 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：幻术系~ END
 							PATCH_IF splschool == 6 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：塑能系~ END
 							PATCH_IF splschool == 7 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：死灵系~ END
-							PATCH_IF splschool == 8 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：改变系~ END
+							PATCH_IF splschool == 8 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：变化系~ END
 							PATCH_IF splschool == 9 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：全部~ END
 							PATCH_IF splschool == 10 BEGIN SPRINT newdesc ~%newdesc%~^~，学派：野魔法~ END
 							READ_BYTE 0x1E splexclue1
@@ -124,7 +124,7 @@ COPY_EXISTING ~SPELL.ids~ ~override~
 							PATCH_IF (splexclue2 & 0b00000100) = 0b00000100 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：幻术系~ END
 							PATCH_IF (splexclue2 & 0b00001000) = 0b00001000 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：塑能系~ END
 							PATCH_IF (splexclue2 & 0b00010000) = 0b00010000 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：死灵系~ END
-							PATCH_IF (splexclue2 & 0b00100000) = 0b00100000 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：改变系~ END
+							PATCH_IF (splexclue2 & 0b00100000) = 0b00100000 BEGIN SPRINT newdesc ~%newdesc%~^~，对立学派：变化系~ END
 							READ_BYTE 0x27 splsecond
 							PATCH_IF splsecond == 1 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：法术防护~ END
 							PATCH_IF splsecond == 2 BEGIN SPRINT newdesc ~%newdesc%~^~，第二类型：特殊防护~ END
